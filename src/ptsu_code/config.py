@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     version: str = "0.1.0"
     verbose: bool = False
     openai_api_key: str = ""
+    anthropic_api_key: str = ""
+    llm_provider: str = "openai"
     history_dir: Path = Path.home() / ".ptsu" / "history"
 
 

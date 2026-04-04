@@ -18,12 +18,29 @@ AI エージェント CLI ツール
 # 依存関係のインストール
 uv sync --all-extras
 
-# CLIの起動
+# 環境変数の設定
+cp .env.example .env
+# .envファイルを編集してAPIキーを設定
+
+# CLIの起動（OpenAI）
+export PTSU_OPENAI_API_KEY=your-api-key
 uv run ptsu chat
+
+# CLIの起動（Anthropic）
+export PTSU_ANTHROPIC_API_KEY=your-api-key
+uv run ptsu chat --provider anthropic
+
+# エコーモード（APIキー不要）
+uv run ptsu chat --no-llm
 
 # バージョン確認
 uv run ptsu version
 ```
+
+### 対応プロバイダー
+
+- **OpenAI** (デフォルト): GPT-4o-mini
+- **Anthropic**: Claude 3.5 Sonnet
 
 ### Docker環境
 

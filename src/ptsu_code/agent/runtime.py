@@ -3,12 +3,12 @@
 from dataclasses import dataclass, field
 from typing import Any
 
-from openai import OpenAI
-from openai.types.chat import ChatCompletion, ChatCompletionMessageParam
-
 from ptsu_code.config import settings
 from ptsu_code.exceptions import PTSUError
 
+from .providers.anthropic_provider import AnthropicProvider
+from .providers.base import LLMProvider
+from .providers.openai_provider import OpenAIProvider
 from .tools.registry import ToolRegistry
 
 
@@ -26,11 +26,11 @@ class Message:
     tool_call_id: str | None = None
     name: str | None = None
 
-    def to_openai_format(self) -> ChatCompletionMessageParam:
-        """OpenAI API形式に変換する。
+    def to_dict(self) -> dict[str, Any]:
+        """辞書形式に変換する。
 
         Returns:
-            OpenAI API形式のメッセージ
+            辞書形式のメッセージ
         """
         msg: dict[str, Any] = {
             "role": self.role,
@@ -46,7 +46,7 @@ class Message:
         if self.name:
             msg["name"] = self.name
 
-        return msg  # type: ignore
+        return msg
 
 
 @dataclass
@@ -55,7 +55,7 @@ class AgentSession:
 
     messages: list[Message] = field(default_factory=list)
     tool_registry: ToolRegistry = field(default_factory=ToolRegistry)
-    model: str = "gpt-4o-mini"
+    model: str | None = None
     max_turns: int = 10
     temperature: float = 0.7
 
@@ -69,38 +69,65 @@ class AgentSession:
         """
         self.messages.append(Message(role=role, content=content, **kwargs))
 
-    def get_openai_messages(self) -> list[ChatCompletionMessageParam]:
-        """OpenAI API形式のメッセージリストを取得する。
+    def get_messages(self) -> list[dict[str, Any]]:
+        """メッセージリストを取得する。
 
         Returns:
-            OpenAI API形式のメッセージリスト
+            メッセージリスト
         """
-        return [msg.to_openai_format() for msg in self.messages]
+        return [msg.to_dict() for msg in self.messages]
 
 
 class AgentRuntime:
     """エージェント実行ランタイム。"""
 
-    def __init__(self, api_key: str | None = None) -> None:
+    def __init__(
+        self,
+        provider: str | None = None,
+        api_key: str | None = None,
+        model: str | None = None,
+    ) -> None:
         """初期化。
 
         Args:
-            api_key: OpenAI APIキー。Noneの場合は設定から取得
+            provider: LLMプロバイダー ('openai' or 'anthropic')
+            api_key: APIキー。Noneの場合は設定から取得
+            model: モデル名
         """
-        self.api_key = api_key or settings.openai_api_key
-        if not self.api_key:
-            raise RuntimeError("OpenAI API key is not configured", {"config_key": "openai_api_key"})
+        self.provider_name = provider or settings.llm_provider
+        self.llm: LLMProvider
 
-        self.client = OpenAI(api_key=self.api_key)
+        if self.provider_name == "anthropic":
+            api_key = api_key or settings.anthropic_api_key
+            if not api_key:
+                raise RuntimeError(
+                    "Anthropic API key is not configured",
+                    {"config_key": "anthropic_api_key"},
+                )
+            self.llm = AnthropicProvider(
+                api_key=api_key,
+                default_model=model or "claude-3-5-sonnet-20241022",
+            )
+        else:
+            api_key = api_key or settings.openai_api_key
+            if not api_key:
+                raise RuntimeError(
+                    "OpenAI API key is not configured",
+                    {"config_key": "openai_api_key"},
+                )
+            self.llm = OpenAIProvider(
+                api_key=api_key,
+                default_model=model or "gpt-4o-mini",
+            )
 
-    def run_turn(self, session: AgentSession) -> ChatCompletion:
+    def run_turn(self, session: AgentSession) -> Any:
         """1ターンの会話を実行する。
 
         Args:
             session: エージェントセッション
 
         Returns:
-            OpenAI APIのレスポンス
+            LLMレスポンス
 
         Raises:
             RuntimeError: API呼び出しに失敗した場合
@@ -108,17 +135,17 @@ class AgentRuntime:
         try:
             tools = session.tool_registry.get_openai_schemas() if len(session.tool_registry) > 0 else None
 
-            response = self.client.chat.completions.create(
-                model=session.model,
-                messages=session.get_openai_messages(),
+            response = self.llm.chat(
+                messages=session.get_messages(),
                 tools=tools,
                 temperature=session.temperature,
+                model=session.model,
             )
 
             return response
 
         except Exception as e:
-            raise RuntimeError(f"Failed to run turn: {e}", {"model": session.model}) from e
+            raise RuntimeError(f"Failed to run turn: {e}", {"provider": self.provider_name}) from e
 
     def execute_tool_calls(self, session: AgentSession, tool_calls: list[dict[str, Any]]) -> list[Message]:
         """ツール呼び出しを実行する。
@@ -180,23 +207,22 @@ class AgentRuntime:
 
         for turn in range(session.max_turns):
             response = self.run_turn(session)
-            message = response.choices[0].message
 
-            if message.tool_calls:
+            if response.tool_calls:
                 session.add_message(
                     "assistant",
-                    message.content or "",
-                    tool_calls=[tc.model_dump() for tc in message.tool_calls],
+                    response.content,
+                    tool_calls=response.tool_calls,
                 )
 
-                tool_results = self.execute_tool_calls(session, [tc.model_dump() for tc in message.tool_calls])
+                tool_results = self.execute_tool_calls(session, response.tool_calls)
 
                 for result in tool_results:
                     session.messages.append(result)
 
             else:
-                session.add_message("assistant", message.content or "")
-                return message.content or ""
+                session.add_message("assistant", response.content)
+                return response.content
 
         raise RuntimeError(
             f"Maximum turns ({session.max_turns}) exceeded without completion",

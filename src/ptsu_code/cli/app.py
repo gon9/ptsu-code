@@ -24,6 +24,7 @@ app = typer.Typer(
 def chat(
     verbose: Annotated[bool, typer.Option("--verbose", "-v", help="Enable verbose output")] = False,
     use_llm: Annotated[bool, typer.Option("--llm/--no-llm", help="Use LLM (requires API key)")] = True,
+    provider: Annotated[str, typer.Option("--provider", "-p", help="LLM provider (openai/anthropic)")] = "",
 ) -> None:
     """対話モードを起動する。"""
     try:
@@ -39,12 +40,22 @@ def chat(
         session = None
 
         if use_llm:
-            if not settings.openai_api_key:
-                show_error("OpenAI API key is not configured. Set PTSU_OPENAI_API_KEY environment variable.")
-                show_info("Falling back to echo mode. Use --no-llm to suppress this message.")
-                use_llm = False
+            provider_name = provider or settings.llm_provider
+
+            # APIキーチェック
+            if provider_name == "anthropic":
+                if not settings.anthropic_api_key:
+                    show_error("Anthropic API key is not configured. Set PTSU_ANTHROPIC_API_KEY environment variable.")
+                    show_info("Falling back to echo mode. Use --no-llm to suppress this message.")
+                    use_llm = False
             else:
-                runtime = AgentRuntime()
+                if not settings.openai_api_key:
+                    show_error("OpenAI API key is not configured. Set PTSU_OPENAI_API_KEY environment variable.")
+                    show_info("Falling back to echo mode. Use --no-llm to suppress this message.")
+                    use_llm = False
+
+            if use_llm:
+                runtime = AgentRuntime(provider=provider_name)
                 session = AgentSession()
                 session.tool_registry.register(FileReadTool())
                 session.tool_registry.register(FileWriteTool())
@@ -55,7 +66,7 @@ def chat(
                     "and command execution. Help the user with their coding tasks efficiently."
                 )
                 session.add_message("system", system_prompt)
-                show_info(f"LLM mode enabled with {len(session.tool_registry)} tools available.")
+                show_info(f"LLM mode enabled ({provider_name}) with {len(session.tool_registry)} tools available.")
 
         show_info("Chat mode started. Type your message and press Enter.")
 
