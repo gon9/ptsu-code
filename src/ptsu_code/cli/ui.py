@@ -14,7 +14,7 @@ def show_welcome(version: str) -> None:
         version: アプリケーションバージョン
     """
     logo = Text.from_markup(
-        "[bold cyan]PTSU[/bold cyan] - [italic]Claude Code Clone[/italic]",
+        "[bold cyan]PTSU[/bold cyan] - [italic]AI Agent CLI[/italic]",
         justify="center",
     )
     welcome_text = Text.from_markup(

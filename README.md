@@ -1,6 +1,6 @@
-# PTSU - Claude Code Clone
+# PTSU
 
-Claude Code の未公開機能を完全再現した AI エージェント CLI
+AI エージェント CLI ツール
 
 ## 機能
 

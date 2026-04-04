@@ -28,7 +28,7 @@ class TestHelpCommand:
         """helpオプションが正しく表示されることを確認する。"""
         result = runner.invoke(app, ["--help"])
         assert result.exit_code == 0
-        assert "PTSU - Claude Code Clone" in result.stdout
+        assert "PTSU - AI Agent CLI" in result.stdout
 
     def test_chat_help_command(self):
         """chatコマンドのhelpが正しく表示されることを確認する。"""

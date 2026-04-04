@@ -15,7 +15,7 @@ from ptsu_code.exceptions import handle_exception
 
 app = typer.Typer(
     name="ptsu",
-    help="PTSU - Claude Code Clone with unreleased features",
+    help="PTSU - AI Agent CLI tool",
     add_completion=False,
 )
 

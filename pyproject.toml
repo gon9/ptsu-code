@@ -1,7 +1,7 @@
 [project]
 name = "ptsu-code"
 version = "0.1.0"
-description = "Claude Code Clone with unreleased features - AI Agent CLI"
+description = "AI Agent CLI tool with advanced features"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
