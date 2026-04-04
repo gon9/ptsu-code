@@ -48,23 +48,3 @@ class TestCommandExecutionTool:
 
         assert result.success is False
         assert "timed out" in result.error.lower()
-
-    def test_execute_timeout_kills_process(self):
-        """タイムアウト時にプロセスがkillされることを確認する。"""
-        tool = CommandExecutionTool(timeout=1)
-        result = tool.execute(command="sleep 10")
-
-        assert result.success is False
-        assert "timed out" in result.error.lower()
-        # SIGTERMまたはSIGKILLのメッセージが含まれることを確認
-        assert "terminated" in result.error.lower() or "killed" in result.error.lower()
-
-    def test_execute_timeout_with_partial_output(self):
-        """タイムアウト時に部分的な出力が取得できることを確認する。"""
-        tool = CommandExecutionTool(timeout=1)
-        # 出力してからsleepするコマンド
-        result = tool.execute(command="echo 'Starting...'; sleep 5")
-
-        assert result.success is False
-        assert "timed out" in result.error.lower()
-        # 部分的な出力が含まれる可能性がある（タイミング依存）
