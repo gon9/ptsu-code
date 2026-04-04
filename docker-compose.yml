@@ -1,0 +1,14 @@
+services:
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./src:/app/src:ro
+      - ~/.ptsu:/root/.ptsu
+    environment:
+      - PTSU_VERBOSE=false
+      - PTSU_OPENAI_API_KEY=${PTSU_OPENAI_API_KEY:-}
+    stdin_open: true
+    tty: true
+    command: chat

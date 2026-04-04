@@ -1,0 +1,41 @@
+[project]
+name = "ptsu-code"
+version = "0.1.0"
+description = "Claude Code Clone with unreleased features - AI Agent CLI"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "typer[all]>=0.12.0",
+    "rich>=13.7.0",
+    "prompt-toolkit>=3.0.43",
+    "pydantic-settings>=2.2.0",
+]
+
+[project.scripts]
+ptsu = "ptsu_code.cli.app:main"
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.3.0",
+    "pytest>=8.0.0",
+    "pytest-cov>=4.1.0",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --cov=src/ptsu_code --cov-report=term-missing"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
