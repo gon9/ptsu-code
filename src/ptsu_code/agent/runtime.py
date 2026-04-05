@@ -6,6 +6,7 @@ from typing import Any
 from ptsu_code.config import settings
 from ptsu_code.exceptions import PTSUError
 
+from .approval import ApprovalManager
 from .providers.anthropic_provider import AnthropicProvider
 from .providers.base import LLMProvider
 from .providers.openai_provider import OpenAIProvider
@@ -55,6 +56,7 @@ class AgentSession:
 
     messages: list[Message] = field(default_factory=list)
     tool_registry: ToolRegistry = field(default_factory=ToolRegistry)
+    approval_manager: ApprovalManager = field(default_factory=ApprovalManager)
     model: str | None = None
     max_turns: int = 10
     temperature: float = 0.7
@@ -147,12 +149,20 @@ class AgentRuntime:
         except Exception as e:
             raise RuntimeError(f"Failed to run turn: {e}", {"provider": self.provider_name}) from e
 
-    def execute_tool_calls(self, session: AgentSession, tool_calls: list[dict[str, Any]]) -> list[Message]:
+    def execute_tool_calls(
+        self,
+        session: AgentSession,
+        tool_calls: list[dict[str, Any]],
+        request_approval_callback: Any = None,
+        show_progress_callback: Any = None,
+    ) -> list[Message]:
         """ツール呼び出しを実行する。
 
         Args:
             session: エージェントセッション
             tool_calls: ツール呼び出しリスト
+            request_approval_callback: 承認を求めるコールバック関数
+            show_progress_callback: 進捗を表示するコールバック関数
 
         Returns:
             ツール実行結果のメッセージリスト
@@ -167,7 +177,59 @@ class AgentRuntime:
                 import json
 
                 args = json.loads(function_args)
+
+                # 承認チェック
+                tool = session.tool_registry.get(function_name)
+                if tool and session.approval_manager.needs_approval(
+                    function_name, tool.requires_approval
+                ):
+                    # 承認を求める
+                    if request_approval_callback:
+                        decision = request_approval_callback(function_name, args)
+
+                        if decision == "n":
+                            # 拒否された
+                            results.append(
+                                Message(
+                                    role="tool",
+                                    content="Tool execution rejected by user",
+                                    tool_call_id=tool_call["id"],
+                                    name=function_name,
+                                )
+                            )
+                            continue
+                        elif decision == "a":
+                            # 常に承認
+                            session.approval_manager.add_auto_approved_tool(function_name)
+                    else:
+                        # コールバックがない場合は拒否
+                        results.append(
+                            Message(
+                                role="tool",
+                                content="Tool execution requires approval but no callback provided",
+                                tool_call_id=tool_call["id"],
+                                name=function_name,
+                            )
+                        )
+                        continue
+
+                # 進捗表示
+                if show_progress_callback:
+                    show_progress_callback(function_name, args, "executing")
+
+                # ツール実行
                 result = session.tool_registry.execute(function_name, **args)
+
+                # 結果表示
+                if show_progress_callback:
+                    show_progress_callback(
+                        function_name,
+                        args,
+                        "completed",
+                        success=result.success,
+                        output=result.output,
+                        error=result.error,
+                    )
 
                 results.append(
                     Message(
@@ -190,12 +252,20 @@ class AgentRuntime:
 
         return results
 
-    def run_loop(self, session: AgentSession, user_message: str) -> str:
+    def run_loop(
+        self,
+        session: AgentSession,
+        user_message: str,
+        request_approval_callback: Any = None,
+        show_progress_callback: Any = None,
+    ) -> str:
         """会話ループを実行する。
 
         Args:
             session: エージェントセッション
             user_message: ユーザーメッセージ
+            request_approval_callback: 承認を求めるコールバック関数
+            show_progress_callback: 進捗を表示するコールバック関数
 
         Returns:
             アシスタントの最終応答
@@ -215,7 +285,12 @@ class AgentRuntime:
                     tool_calls=response.tool_calls,
                 )
 
-                tool_results = self.execute_tool_calls(session, response.tool_calls)
+                tool_results = self.execute_tool_calls(
+                    session,
+                    response.tool_calls,
+                    request_approval_callback,
+                    show_progress_callback,
+                )
 
                 for result in tool_results:
                     session.messages.append(result)

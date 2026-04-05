@@ -73,6 +73,15 @@ class FileWriteTool(Tool):
     """ファイル書き込みツール。"""
 
     @property
+    def requires_approval(self) -> bool:
+        """ファイル書き込みは破壊的操作のため承認が必要。
+
+        Returns:
+            True（常に承認が必要）
+        """
+        return True
+
+    @property
     def definition(self) -> ToolDefinition:
         """ツール定義を返す。
 

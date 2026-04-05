@@ -10,8 +10,14 @@ from ptsu_code.config import Settings
 class TestSettings:
     """Settingsクラスのテスト。"""
 
-    def test_default_settings(self):
+    def test_default_settings(self, monkeypatch, tmp_path):
         """デフォルト設定が正しいことを確認する。"""
+        # 環境変数をクリア
+        monkeypatch.delenv("PTSU_OPENAI_API_KEY", raising=False)
+        monkeypatch.delenv("PTSU_ANTHROPIC_API_KEY", raising=False)
+        # .envファイルが存在しないディレクトリに移動
+        monkeypatch.chdir(tmp_path)
+        
         settings = Settings()
         assert settings.app_name == "ptsu"
         assert settings.version == "0.1.0"

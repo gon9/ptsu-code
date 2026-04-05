@@ -76,6 +76,19 @@ class Tool(ABC):
         """
         pass
 
+    @property
+    def requires_approval(self) -> bool:
+        """破壊的操作のため承認が必要な場合 True を返す。
+
+        デフォルトは False（承認不要）。
+        write_file や execute_command など、破壊的な操作を行うツールは
+        このプロパティをオーバーライドして True を返す。
+
+        Returns:
+            承認が必要な場合 True
+        """
+        return False
+
     @abstractmethod
     def execute(self, **kwargs: Any) -> ToolResult:
         """ツールを実行する。

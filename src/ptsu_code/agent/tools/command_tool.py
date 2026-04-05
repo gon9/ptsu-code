@@ -9,6 +9,15 @@ from .base import Tool, ToolDefinition, ToolParameter, ToolResult
 class CommandExecutionTool(Tool):
     """コマンド実行ツール。"""
 
+    @property
+    def requires_approval(self) -> bool:
+        """コマンド実行は破壊的操作の可能性があるため承認が必要。
+
+        Returns:
+            True（常に承認が必要）
+        """
+        return True
+
     def __init__(self, timeout: int = 30) -> None:
         """初期化。
 

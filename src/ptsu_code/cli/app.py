@@ -8,8 +8,17 @@ from ptsu_code import __version__
 from ptsu_code.agent.runtime import AgentRuntime, AgentSession
 from ptsu_code.agent.tools.command_tool import CommandExecutionTool
 from ptsu_code.agent.tools.file_tools import FileReadTool, FileWriteTool
+from ptsu_code.agent.tools.search_tools import FindTool, GrepTool, ListDirTool
 from ptsu_code.cli.prompt import UserPrompt
-from ptsu_code.cli.ui import show_error, show_info, show_message, show_welcome
+from ptsu_code.cli.ui import (
+    show_error,
+    show_info,
+    show_message,
+    show_tool_approval_request,
+    show_tool_execution,
+    show_tool_result,
+    show_welcome,
+)
 from ptsu_code.config import settings
 from ptsu_code.exceptions import handle_exception
 
@@ -60,6 +69,9 @@ def chat(
                 session.tool_registry.register(FileReadTool())
                 session.tool_registry.register(FileWriteTool())
                 session.tool_registry.register(CommandExecutionTool())
+                session.tool_registry.register(GrepTool())
+                session.tool_registry.register(FindTool())
+                session.tool_registry.register(ListDirTool())
 
                 system_prompt = (
                     "You are PTSU, an AI coding assistant. You have access to tools for file operations "
@@ -92,7 +104,7 @@ def chat(
                 )
                 if use_llm and session:
                     help_text += f"  - LLM mode: Active with {len(session.tool_registry)} tools\n"
-                    help_text += "  - Tools: read_file, write_file, execute_command"
+                    help_text += "  - Tools: read_file, write_file, execute_command, grep_search, find_files, list_directory"
                 else:
                     help_text += "  - Echo mode: Messages are echoed back"
                 show_message("system", help_text)
@@ -100,7 +112,23 @@ def chat(
 
             if use_llm and runtime and session:
                 try:
-                    response = runtime.run_loop(session, user_input)
+                    # 承認コールバック関数
+                    def request_approval(tool_name: str, args: dict) -> str:
+                        return show_tool_approval_request(tool_name, args)
+
+                    # 進捗表示コールバック関数
+                    def show_progress(tool_name: str, args: dict, status: str, **kwargs) -> None:
+                        if status == "executing":
+                            show_tool_execution(tool_name, args)
+                        elif status == "completed":
+                            show_tool_result(
+                                tool_name,
+                                kwargs.get("success", False),
+                                kwargs.get("output", ""),
+                                kwargs.get("error", ""),
+                            )
+
+                    response = runtime.run_loop(session, user_input, request_approval, show_progress)
                     show_message("assistant", response)
                 except Exception as e:
                     error_msg = handle_exception(e, verbose=settings.verbose)
