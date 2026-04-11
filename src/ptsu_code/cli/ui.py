@@ -37,17 +37,51 @@ def show_message(role: str, content: str) -> None:
     """メッセージを表示する。
 
     Args:
-        role: メッセージの送信者 (user/assistant/system)
+        role: メッセージの役割
         content: メッセージ内容
     """
     if role == "user":
-        console.print(f"[bold blue]You:[/bold blue] {content}")
+        prefix = "[bold cyan]You:[/bold cyan]"
     elif role == "assistant":
-        console.print(f"[bold green]Assistant:[/bold green] {content}")
+        prefix = "[bold green]Assistant:[/bold green]"
     elif role == "system":
-        console.print(f"[bold yellow]System:[/bold yellow] {content}")
+        prefix = "[bold yellow]System:[/bold yellow]"
     else:
-        console.print(content)
+        prefix = content
+        content = ""
+
+    if content:
+        console.print(f"{prefix} {content}")
+    else:
+        console.print(prefix)
+
+
+def show_streaming_start(role: str = "assistant") -> None:
+    """ストリーミング開始時のプレフィックスを表示する。
+
+    Args:
+        role: メッセージの役割
+    """
+    if role == "assistant":
+        prefix = "[bold green]Assistant:[/bold green]"
+    else:
+        prefix = f"[bold]{role}:[/bold]"
+
+    console.print(prefix, end=" ")
+
+
+def show_streaming_chunk(content: str) -> None:
+    """ストリーミングチャンクを表示する。
+
+    Args:
+        content: チャンク内容
+    """
+    console.print(content, end="")
+
+
+def show_streaming_end() -> None:
+    """ストリーミング終了時に改行する。"""
+    console.print()
 
 
 def show_error(message: str) -> None:

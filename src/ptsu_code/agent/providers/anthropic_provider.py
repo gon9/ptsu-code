@@ -1,10 +1,11 @@
-"""Anthropicプロバイダー。"""
+"""Anthropic LLMプロバイダー。"""
 
+from collections.abc import Iterator
 from typing import Any
 
 from anthropic import Anthropic
 
-from .base import LLMProvider, LLMResponse
+from .base import LLMProvider, LLMResponse, LLMStreamChunk
 
 
 class AnthropicProvider(LLMProvider):
@@ -128,5 +129,98 @@ class AnthropicProvider(LLMProvider):
         return LLMResponse(
             content=content,
             tool_calls=tool_calls,
-            stop_reason=response.stop_reason or "end_turn",
+            finish_reason=response.stop_reason,
         )
+
+    def stream(
+        self,
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]] | None = None,
+        temperature: float = 0.7,
+        model: str | None = None,
+    ) -> Iterator[LLMStreamChunk]:
+        """ストリーミングでチャット補完を実行する。
+
+        Args:
+            messages: メッセージリスト
+            tools: ツール定義リスト
+            temperature: 温度パラメータ
+            model: モデル名
+
+        Yields:
+            ストリーミングチャンク
+        """
+        model = model or self.default_model
+
+        # Anthropic形式に変換
+        system_message = None
+        anthropic_messages = []
+
+        for msg in messages:
+            if msg["role"] == "system":
+                system_message = msg["content"]
+            else:
+                anthropic_messages.append(msg)
+
+        kwargs: dict[str, Any] = {
+            "model": model,
+            "messages": anthropic_messages,
+            "max_tokens": 4096,
+            "temperature": temperature,
+            "stream": True,
+        }
+
+        if system_message:
+            kwargs["system"] = system_message
+
+        if tools:
+            kwargs["tools"] = tools
+
+        stream = self.client.messages.create(**kwargs)
+
+        content_parts = []
+        tool_calls_parts: dict[str, dict] = {}
+
+        for event in stream:
+            if event.type == "content_block_start":
+                if event.content_block.type == "text":
+                    pass  # テキストブロック開始
+                elif event.content_block.type == "tool_use":
+                    # ツール使用ブロック開始
+                    tool_id = event.content_block.id
+                    tool_calls_parts[tool_id] = {
+                        "id": tool_id,
+                        "type": "function",
+                        "function": {
+                            "name": event.content_block.name,
+                            "arguments": "",
+                        },
+                    }
+
+            elif event.type == "content_block_delta":
+                if event.delta.type == "text_delta":
+                    # テキストの差分
+                    content_delta = event.delta.text
+                    content_parts.append(content_delta)
+                    yield LLMStreamChunk(content_delta=content_delta)
+
+                elif event.delta.type == "input_json_delta":
+                    # ツール入力の差分
+                    # Anthropicは最後のツールIDを追跡する必要がある
+                    if tool_calls_parts:
+                        last_tool_id = list(tool_calls_parts.keys())[-1]
+                        tool_calls_parts[last_tool_id]["function"]["arguments"] += event.delta.partial_json
+
+            elif event.type == "message_delta":
+                # メッセージ完了
+                if event.delta.stop_reason:
+                    tool_calls = list(tool_calls_parts.values()) if tool_calls_parts else None
+                    final_response = LLMResponse(
+                        content="".join(content_parts),
+                        tool_calls=tool_calls,
+                        finish_reason=event.delta.stop_reason,
+                    )
+                    yield LLMStreamChunk(
+                        is_final=True,
+                        final_response=final_response,
+                    )

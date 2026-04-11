@@ -1,5 +1,6 @@
 """Agent実行ランタイム。"""
 
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -8,7 +9,7 @@ from ptsu_code.exceptions import PTSUError
 
 from .approval import ApprovalManager
 from .providers.anthropic_provider import AnthropicProvider
-from .providers.base import LLMProvider
+from .providers.base import LLMProvider, LLMStreamChunk
 from .providers.openai_provider import OpenAIProvider
 from .tools.registry import ToolRegistry
 
@@ -148,6 +149,32 @@ class AgentRuntime:
 
         except Exception as e:
             raise RuntimeError(f"Failed to run turn: {e}", {"provider": self.provider_name}) from e
+
+    def run_turn_stream(self, session: AgentSession) -> Iterator[LLMStreamChunk]:
+        """ターンをストリーミングで実行する。
+
+        Args:
+            session: エージェントセッション
+
+        Yields:
+            ストリーミングチャンク
+
+        Raises:
+            RuntimeError: ターン実行に失敗した場合
+        """
+        try:
+            messages = [msg.to_dict() for msg in session.messages]
+            tools = session.tool_registry.get_openai_schemas()
+
+            yield from self.provider.stream(
+                messages=messages,
+                tools=tools,
+                temperature=session.temperature,
+                model=session.model,
+            )
+
+        except Exception as e:
+            raise RuntimeError(f"Failed to run turn stream: {e}", {"provider": self.provider_name}) from e
 
     def execute_tool_calls(
         self,
@@ -301,5 +328,78 @@ class AgentRuntime:
 
         raise RuntimeError(
             f"Maximum turns ({session.max_turns}) exceeded without completion",
-            {"max_turns": session.max_turns, "current_turn": turn},
+            {"turns": session.max_turns},
+        )
+
+    def run_loop_stream(
+        self,
+        session: AgentSession,
+        user_message: str,
+        request_approval_callback: Any = None,
+        show_progress_callback: Any = None,
+        stream_callback: Any = None,
+    ) -> str:
+        """会話ループをストリーミングで実行する。
+
+        Args:
+            session: エージェントセッション
+            user_message: ユーザーメッセージ
+            request_approval_callback: 承認を求めるコールバック関数
+            show_progress_callback: 進捗を表示するコールバック関数
+            stream_callback: ストリーミングチャンクを処理するコールバック関数
+
+        Returns:
+            アシスタントの最終応答
+
+        Raises:
+            RuntimeError: 最大ターン数を超えた場合
+        """
+        session.add_message("user", user_message)
+
+        for turn in range(session.max_turns):
+            # ストリーミング開始を通知
+            if stream_callback:
+                stream_callback("start")
+
+            final_response = None
+            for chunk in self.run_turn_stream(session):
+                # コンテンツチャンクを通知
+                if chunk.content_delta and stream_callback:
+                    stream_callback("chunk", chunk.content_delta)
+
+                # 最終チャンク
+                if chunk.is_final and chunk.final_response:
+                    final_response = chunk.final_response
+
+            # ストリーミング終了を通知
+            if stream_callback:
+                stream_callback("end")
+
+            if not final_response:
+                raise RuntimeError("No final response received from stream")
+
+            if final_response.tool_calls:
+                session.add_message(
+                    "assistant",
+                    final_response.content,
+                    tool_calls=final_response.tool_calls,
+                )
+
+                tool_results = self.execute_tool_calls(
+                    session,
+                    final_response.tool_calls,
+                    request_approval_callback,
+                    show_progress_callback,
+                )
+
+                for result in tool_results:
+                    session.messages.append(result)
+
+            else:
+                session.add_message("assistant", final_response.content)
+                return final_response.content
+
+        raise RuntimeError(
+            f"Maximum turns ({session.max_turns}) exceeded without completion",
+            {"turns": session.max_turns},
         )

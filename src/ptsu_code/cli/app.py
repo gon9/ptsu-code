@@ -5,6 +5,7 @@ from typing import Annotated
 import typer
 
 from ptsu_code import __version__
+from ptsu_code.agent.prompts import SystemPrompts
 from ptsu_code.agent.runtime import AgentRuntime, AgentSession
 from ptsu_code.agent.tools.command_tool import CommandExecutionTool
 from ptsu_code.agent.tools.file_tools import FileReadTool, FileWriteTool
@@ -14,6 +15,9 @@ from ptsu_code.cli.ui import (
     show_error,
     show_info,
     show_message,
+    show_streaming_chunk,
+    show_streaming_end,
+    show_streaming_start,
     show_tool_approval_request,
     show_tool_execution,
     show_tool_result,
@@ -32,8 +36,9 @@ app = typer.Typer(
 @app.command()
 def chat(
     verbose: Annotated[bool, typer.Option("--verbose", "-v", help="Enable verbose output")] = False,
-    use_llm: Annotated[bool, typer.Option("--llm/--no-llm", help="Use LLM (requires API key)")] = True,
-    provider: Annotated[str, typer.Option("--provider", "-p", help="LLM provider (openai/anthropic)")] = "",
+    llm: Annotated[bool, typer.Option("--llm/--no-llm", help="Enable LLM mode")] = True,
+    provider: Annotated[str, typer.Option(help="LLM provider (openai or anthropic)")] = "openai",
+    stream: Annotated[bool, typer.Option("--stream/--no-stream", help="Enable streaming responses")] = True,
 ) -> None:
     """対話モードを起動する。"""
     try:
@@ -47,6 +52,7 @@ def chat(
 
         runtime = None
         session = None
+        use_llm = llm
 
         if use_llm:
             provider_name = provider or settings.llm_provider
@@ -73,10 +79,7 @@ def chat(
                 session.tool_registry.register(FindTool())
                 session.tool_registry.register(ListDirTool())
 
-                system_prompt = (
-                    "You are PTSU, an AI coding assistant. You have access to tools for file operations "
-                    "and command execution. Help the user with their coding tasks efficiently."
-                )
+                system_prompt = SystemPrompts.coding_assistant()
                 session.add_message("system", system_prompt)
                 show_info(f"LLM mode enabled ({provider_name}) with {len(session.tool_registry)} tools available.")
 
@@ -128,8 +131,22 @@ def chat(
                                 kwargs.get("error", ""),
                             )
 
-                    response = runtime.run_loop(session, user_input, request_approval, show_progress)
-                    show_message("assistant", response)
+                    # ストリーミングコールバック関数
+                    def handle_stream(event: str, content: str = "") -> None:
+                        if event == "start":
+                            show_streaming_start()
+                        elif event == "chunk":
+                            show_streaming_chunk(content)
+                        elif event == "end":
+                            show_streaming_end()
+
+                    if stream:
+                        response = runtime.run_loop_stream(
+                            session, user_input, request_approval, show_progress, handle_stream
+                        )
+                    else:
+                        response = runtime.run_loop(session, user_input, request_approval, show_progress)
+                        show_message("assistant", response)
                 except Exception as e:
                     error_msg = handle_exception(e, verbose=settings.verbose)
                     show_error(f"LLM error: {error_msg}")
