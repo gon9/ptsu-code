@@ -98,7 +98,7 @@ class AgentRuntime:
             model: モデル名
         """
         self.provider_name = provider or settings.llm_provider
-        self.llm: LLMProvider
+        self.provider: LLMProvider
 
         if self.provider_name == "anthropic":
             api_key = api_key or settings.anthropic_api_key
@@ -107,7 +107,7 @@ class AgentRuntime:
                     "Anthropic API key is not configured",
                     {"config_key": "anthropic_api_key"},
                 )
-            self.llm = AnthropicProvider(
+            self.provider = AnthropicProvider(
                 api_key=api_key,
                 default_model=model or "claude-3-5-sonnet-20241022",
             )
@@ -118,7 +118,7 @@ class AgentRuntime:
                     "OpenAI API key is not configured",
                     {"config_key": "openai_api_key"},
                 )
-            self.llm = OpenAIProvider(
+            self.provider = OpenAIProvider(
                 api_key=api_key,
                 default_model=model or "gpt-4o-mini",
             )
@@ -138,7 +138,7 @@ class AgentRuntime:
         try:
             tools = session.tool_registry.get_openai_schemas() if len(session.tool_registry) > 0 else None
 
-            response = self.llm.chat(
+            response = self.provider.chat(
                 messages=session.get_messages(),
                 tools=tools,
                 temperature=session.temperature,
