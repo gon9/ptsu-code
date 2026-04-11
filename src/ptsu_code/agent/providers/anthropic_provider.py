@@ -153,28 +153,22 @@ class AnthropicProvider(LLMProvider):
         model = model or self.default_model
 
         # Anthropic形式に変換
-        system_message = None
-        anthropic_messages = []
-
-        for msg in messages:
-            if msg["role"] == "system":
-                system_message = msg["content"]
-            else:
-                anthropic_messages.append(msg)
+        system_prompt, converted_messages = self._convert_messages(messages)
+        converted_tools = self._convert_tools(tools)
 
         kwargs: dict[str, Any] = {
             "model": model,
-            "messages": anthropic_messages,
+            "messages": converted_messages,
             "max_tokens": 4096,
             "temperature": temperature,
             "stream": True,
         }
 
-        if system_message:
-            kwargs["system"] = system_message
+        if system_prompt:
+            kwargs["system"] = system_prompt
 
-        if tools:
-            kwargs["tools"] = tools
+        if converted_tools:
+            kwargs["tools"] = converted_tools
 
         stream = self.client.messages.create(**kwargs)
 
