@@ -62,19 +62,19 @@ Help the user accomplish their coding tasks efficiently and safely."""
             コンテキスト付きプロンプト
         """
         context_parts = []
-        
+
         if "project_info" in context:
             context_parts.append(f"\n## Project Context\n{context['project_info']}")
-        
+
         if "current_task" in context:
             context_parts.append(f"\n## Current Task\n{context['current_task']}")
-        
+
         if "constraints" in context:
             context_parts.append(f"\n## Constraints\n{context['constraints']}")
-        
+
         if context_parts:
             return base_prompt + "\n" + "\n".join(context_parts)
-        
+
         return base_prompt
 
 

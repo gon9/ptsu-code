@@ -1,9 +1,6 @@
 """検索ツールのテスト。"""
 
-import tempfile
-from pathlib import Path
 
-import pytest
 
 from ptsu_code.agent.tools.search_tools import FindTool, GrepTool, ListDirTool
 
@@ -171,7 +168,7 @@ class TestListDirTool:
         (tmp_path / ".hidden").touch()
 
         tool = ListDirTool()
-        
+
         # 隠しファイルなし
         result = tool.execute(path=str(tmp_path), show_hidden=False)
         assert result.success is True

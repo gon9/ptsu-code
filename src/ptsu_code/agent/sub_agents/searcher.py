@@ -1,0 +1,98 @@
+"""コードベース調査・検索に特化したSub-agent。"""
+
+from typing import TYPE_CHECKING, Any
+
+from ptsu_code.agent.sub_agents.base import AgentRole, SubAgent, SubAgentConfig
+
+if TYPE_CHECKING:
+    from ptsu_code.agent.runtime import AgentRuntime
+
+
+class SearcherAgent(SubAgent):
+    """コードベースの調査・検索を担当するSub-agent。
+
+    読み取り専用ツールのみ使用し、ファイル書き込みやコマンド実行は行わない。
+    """
+
+    @property
+    def config(self) -> SubAgentConfig:
+        """Sub-agentの設定を返す。"""
+        return SubAgentConfig(
+            role=AgentRole.SEARCHER,
+            name="Searcher",
+            description="Explores and searches the codebase to find relevant files and code sections",
+            system_prompt=self._get_system_prompt(),
+            allowed_tools=["read_file", "grep_search", "find_files", "list_directory"],
+            max_turns=5,
+            temperature=0.3,
+        )
+
+    def run(
+        self,
+        runtime: "AgentRuntime",
+        message: str,
+        context: dict[str, Any] | None = None,
+    ) -> str:
+        """コードベース検索タスクを実行する。
+
+        allowed_toolsのみをセッションに登録してruntime.run_loopを呼び出す。
+
+        Args:
+            runtime: AgentRuntimeインスタンス
+            message: ユーザーメッセージ
+            context: コンテキスト情報（オプション）
+
+        Returns:
+            検索結果のサマリー
+        """
+        from ptsu_code.agent.runtime import AgentSession
+        from ptsu_code.agent.tools.registry import ToolRegistry
+
+        cfg = self.config
+
+        restricted_registry = ToolRegistry()
+        for tool_name in cfg.allowed_tools:
+            tool = runtime.session_tool_registry.get_tool(tool_name) if hasattr(runtime, "session_tool_registry") else None
+            if tool is not None:
+                restricted_registry.register(tool)
+
+        session = AgentSession(
+            tool_registry=restricted_registry,
+            model=None,
+            max_turns=cfg.max_turns,
+            temperature=cfg.temperature,
+        )
+        session.add_message("system", cfg.system_prompt)
+
+        if context:
+            context_lines = []
+            for key, value in context.items():
+                context_lines.append(f"{key}: {value}")
+            context_text = "\n".join(context_lines)
+            session.add_message("system", f"Context:\n{context_text}")
+
+        return runtime.run_loop(session, message)
+
+    def _get_system_prompt(self) -> str:
+        """システムプロンプトを返す。"""
+        return """You are a Searcher Agent specialized in exploring codebases.
+
+Your role:
+- Find relevant files and code sections
+- Understand code structure and dependencies
+- Provide clear summaries of findings
+- DO NOT modify any files
+- DO NOT execute any commands
+
+Available tools:
+- read_file: Read file contents
+- grep_search: Search for patterns in files
+- find_files: Find files by name
+- list_directory: List directory contents
+
+Best practices:
+1. Start with broad searches (grep, find)
+2. Read relevant files to understand context
+3. Provide structured summaries
+4. Include file paths and line numbers in your findings
+"""

@@ -17,7 +17,7 @@ class TestSettings:
         monkeypatch.delenv("PTSU_ANTHROPIC_API_KEY", raising=False)
         # .envファイルが存在しないディレクトリに移動
         monkeypatch.chdir(tmp_path)
-        
+
         settings = Settings()
         assert settings.app_name == "ptsu"
         assert settings.version == "0.1.0"

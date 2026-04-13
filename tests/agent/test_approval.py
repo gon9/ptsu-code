@@ -1,8 +1,7 @@
 """ApprovalManagerのテスト。"""
 
-import pytest
 
-from ptsu_code.agent.approval import ApprovalDecision, ApprovalManager
+from ptsu_code.agent.approval import ApprovalManager
 
 
 class TestApprovalManager:
@@ -52,9 +51,9 @@ class TestApprovalManager:
         manager = ApprovalManager()
         manager.add_auto_approved_tool("write_file")
         manager.add_auto_approved_tool("execute_command")
-        
+
         manager.clear_auto_approved_tools()
-        
+
         assert len(manager._auto_approved_tools) == 0
         assert manager.is_auto_approved("write_file") is False
 
@@ -62,7 +61,7 @@ class TestApprovalManager:
         """自動承認チェック。"""
         manager = ApprovalManager()
         assert manager.is_auto_approved("write_file") is False
-        
+
         manager.add_auto_approved_tool("write_file")
         assert manager.is_auto_approved("write_file") is True
         assert manager.is_auto_approved("execute_command") is False
