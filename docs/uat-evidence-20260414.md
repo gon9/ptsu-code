@@ -309,20 +309,326 @@ Assistant: Echo: Hello
 
 ---
 
-## 未実施テスト（後半: UAT-10〜22）
+---
 
-| ID | テスト名 | 状態 | 備考 |
+## UAT-10: ファイル読み取り
+
+**コマンド**:
+```bash
+printf "/tmp/ptsu-uat/src/main.py というファイルの内容を読んで教えて\nexit\n" | uv run ptsu chat --no-stream
+```
+
+**実行結果**:
+```
+⚡ Executing: read_file(path='/tmp/ptsu-uat/src/main.py')
+✓ read_file: def hello(): return 'world'
+Assistant: `/tmp/ptsu-uat/src/main.py` の内容は以下の通りです：
+```
+
+**確認項目**:
+- [x] `⚡ Executing: read_file(...)` が表示される
+- [x] `✓ read_file: ...` で結果が表示される
+- [x] ファイル内容 `def hello(): return 'world'` が応答に含まれる
+
+**判定**: ✅ PASS
+
+---
+
+## UAT-11: ファイル書き込み（承認あり）
+
+**状態**: ⚠️ 手動テストが必要
+
+**理由**: `prompt_toolkit` と `console.input()` が同一 stdin を使用するため、パイプ入力での承認フロー自動化が不安定。
+
+**手動テスト手順**:
+```bash
+uv run ptsu chat --no-stream
+# プロンプトが出たら:
+You > /tmp/ptsu-uat/output.py に print('hello world') と書いて
+# 承認パネルが出たら Y を入力
+Your choice: y
+```
+
+**期待結果**:
+```
+⚠ Tool Approval Required
+  Tool: write_file
+  path: /tmp/ptsu-uat/output.py
+  [Y]es / [N]o / [A]lways approve this tool
+
+Your choice: y
+⚡ Executing: write_file(...)
+✓ write_file: ...
+```
+
+**判定**: 🔲 手動実施待ち
+
+---
+
+## UAT-12: コマンド実行（承認あり）
+
+**状態**: ⚠️ 手動テストが必要
+
+**手動テスト手順**:
+```bash
+uv run ptsu chat --no-stream
+You > pwd コマンドを実行して結果を教えて
+Your choice: y
+```
+
+**期待結果**:
+```
+⚠ Tool Approval Required
+  Tool: execute_command
+  [Y]es / [N]o / [A]lways approve this tool
+
+Your choice: y
+⚡ Executing: execute_command(...)
+✓ execute_command: /Users/gon9a/workspace/claude/ptsu-code
+```
+
+**判定**: 🔲 手動実施待ち
+
+---
+
+## UAT-13: grep 検索
+
+**コマンド**:
+```bash
+printf "/tmp/ptsu-uat/src ディレクトリで def を含む行を grep して\nexit\n" | uv run ptsu chat --no-stream
+```
+
+**実行結果**:
+```
+⚡ Executing: grep_search(pattern='def ', path='/tmp/ptsu-uat/src')
+✓ grep_search: /tmp/ptsu-uat/src/main.py:1:def hello(): return 'world'
+Assistant: `/tmp/ptsu-uat/src/main.py` ファイルの1行目に `def` ...
+```
+
+**確認項目**:
+- [x] `grep_search` ツールが呼ばれる
+- [x] ファイル名と行番号付きで結果が表示される
+- [x] `def hello()` の行が見つかる
+
+**判定**: ✅ PASS
+
+---
+
+## UAT-14: ファイル検索
+
+**コマンド**:
+```bash
+printf "/tmp/ptsu-uat ディレクトリの .py ファイルを find して一覧を出して\nexit\n" | uv run ptsu chat --no-stream
+```
+
+**実行結果**:
+```
+⚡ Executing: find_files(path='/tmp/ptsu-uat', pattern='*.py', type='f')
+✓ find_files: /tmp/ptsu-uat/src/main.py
+Assistant: 以下の Python ファイルが `/tmp/ptsu-uat` ...
+```
+
+**確認項目**:
+- [x] `find_files` ツールが呼ばれる
+- [x] `main.py` が見つかる
+
+**判定**: ✅ PASS
+
+---
+
+## UAT-15: ディレクトリ一覧
+
+**コマンド**:
+```bash
+printf "/tmp/ptsu-uat の中のファイルとディレクトリを一覧して\nexit\n" | uv run ptsu chat --no-stream
+```
+
+**実行結果**:
+```
+⚡ Executing: list_directory(path='/tmp/ptsu-uat')
+✓ list_directory: DIR  -  src
+⚡ Executing: list_directory(path='/tmp/ptsu-uat/src')
+✓ list_directory: FILE  28 bytes  main.py / FILE  30 bytes  script.py
+Assistant: `/tmp/ptsu-uat` ディレクトリの中には `src` ...
+```
+
+**確認項目**:
+- [x] `list_directory` ツールが呼ばれる
+- [x] `src/` ディレクトリが含まれる一覧が表示される
+
+**判定**: ✅ PASS
+
+---
+
+## UAT-16: ストリーミング応答
+
+**コマンド**:
+```bash
+printf "こんにちは\nexit\n" | uv run ptsu chat --stream
+```
+
+**実行結果**:
+```
+Assistant: こんにちは！今日はどのようにお手伝いできますか？
+```
+
+**確認項目**:
+- [x] `--stream` フラグでエラーなく応答が返る
+- [x] `Assistant:` プレフィックス付きで表示される
+- [ ] ※視覚的なストリーミング（逐次表示）は端末接続時に確認要
+
+**判定**: ✅ PASS（機能動作確認）
+
+---
+
+## UAT-17: ストリーミング無効化
+
+**コマンド**:
+```bash
+printf "こんにちは\nexit\n" | uv run ptsu chat --no-stream
+```
+
+**実行結果**:
+```
+Assistant: こんにちは！どのようにお手伝いできますか？
+```
+
+**確認項目**:
+- [x] `--no-stream` フラグでエラーなく応答が返る
+- [x] `Assistant:` プレフィックス付きで一括表示される
+
+**判定**: ✅ PASS
+
+---
+
+## UAT-18: Coordinator Mode 起動確認
+
+**コマンド**:
+```bash
+printf "exit\n" | uv run ptsu chat --coordinator
+```
+
+**実行結果**:
+```
+ℹ LLM mode enabled (openai) with 6 tools available.
+ℹ Chat mode started. Type your message and press Enter.
+You > exit
+ℹ Goodbye!
+```
+
+**確認項目**:
+- [x] `--coordinator` フラグでエラーなく起動する
+- [x] LLM モードが有効化される
+
+**判定**: ✅ PASS
+
+---
+
+## UAT-19: Coordinator — SEARCH インテント
+
+**コマンド**:
+```bash
+printf "AgentRuntimeクラスはどのファイルで定義されているか調べて\nexit\n" | uv run ptsu chat --coordinator --no-stream
+```
+
+**実行結果**:
+```
+[Searcher] dispatched
+Assistant:
+まず、`AgentRuntime`クラスが定義されているファイルを探すために、コードベース内で
+その名前を検索します。これにより、クラスの定義が含まれているファイルを特定します。
+```
+
+**確認項目**:
+- [x] `[Searcher] dispatched` が表示される（Searcher Agent へのディスパッチ確認）
+- [x] 応答が返る
+
+**判定**: ✅ PASS
+
+---
+
+## UAT-20: Coordinator — CODE インテント
+
+**状態**: ⚠️ 手動テストが必要（write_file 承認あり）
+
+**手動テスト手順**:
+```bash
+uv run ptsu chat --coordinator --no-stream
+You > /tmp/ptsu-uat/utils.py にリスト内の最大値を返す関数を書いて
+# 承認プロンプトが出たら Y
+```
+
+**期待結果**: `[Coder] dispatched` が表示され、ファイルが作成される
+
+**判定**: 🔲 手動実施待ち
+
+---
+
+## UAT-21: Coordinator — EXECUTE インテント
+
+**状態**: ⚠️ 手動テストが必要（execute_command 承認あり）
+
+**手動テスト手順**:
+```bash
+uv run ptsu chat --coordinator --no-stream
+You > uv run pytest tests/ --tb=no -q を実行してテスト結果を教えて
+# 承認プロンプトが出たら Y
+```
+
+**期待結果**: `[Executor] dispatched` が表示され、テスト実行結果が返る
+
+**判定**: 🔲 手動実施待ち
+
+---
+
+## UAT-22: Coordinator — MULTI インテント
+
+**状態**: ⚠️ 手動テストが必要（複数の承認あり）
+
+**手動テスト手順**:
+```bash
+uv run ptsu chat --coordinator --no-stream
+You > src/ptsu_code/agent/runtime.py を読んで、その内容をもとに /tmp/ptsu-uat/summary.md にサマリーを書いて
+```
+
+**期待結果**: 複数 Sub-agent が順次呼ばれ、ファイルが作成される
+
+**判定**: 🔲 手動実施待ち
+
+---
+
+## 総合サマリー（自動化分）
+
+| ID | テスト名 | 結果 | 備考 |
 |---|---|---|---|
-| UAT-10 | ファイル読み取り | ⏳ 未実施 | 承認不要・自動化可 |
-| UAT-11 | ファイル書き込み（承認あり）| ⏳ 未実施 | **手動承認が必要** |
-| UAT-12 | コマンド実行（承認あり）| ⏳ 未実施 | **手動承認が必要** |
-| UAT-13 | grep 検索 | ⏳ 未実施 | 自動化可 |
-| UAT-14 | ファイル検索 | ⏳ 未実施 | 自動化可 |
-| UAT-15 | ディレクトリ一覧 | ⏳ 未実施 | 自動化可 |
-| UAT-16 | ストリーミング応答 | ⏳ 未実施 | 自動化可 |
-| UAT-17 | ストリーミング無効化 | ⏳ 未実施 | 自動化可 |
-| UAT-18 | Coordinator Mode 起動 | ⏳ 未実施 | 自動化可 |
-| UAT-19 | SEARCH インテント | ⏳ 未実施 | API依存 |
-| UAT-20 | CODE インテント | ⏳ 未実施 | **手動承認が必要** |
-| UAT-21 | EXECUTE インテント | ⏳ 未実施 | **手動承認が必要** |
-| UAT-22 | MULTI インテント | ⏳ 未実施 | **手動承認が必要** |
+| UAT-01 | バージョン表示 | ✅ PASS | `PTSU version 0.1.0` |
+| UAT-02 | ヘルプ表示 | ✅ PASS | 全5オプション確認済み |
+| UAT-03 | ウェルカム画面 | ✅ PASS | パネル装飾・バージョン・案内文 |
+| UAT-04 | エコーモード | ✅ PASS | 日本語含む |
+| UAT-05 | exit/quit/Ctrl+D | ✅ PASS | 3通りすべて正常終了 |
+| UAT-06 | help コマンド | ✅ PASS | 全コマンド一覧表示 |
+| UAT-07 | LLMモード起動 | ✅ PASS | 6ツール登録確認 |
+| UAT-08 | 基本質問応答 | ✅ PASS | Pythonコード生成 |
+| UAT-09 | APIキーなしフォールバック | ✅ PASS | エコーモードへ継続 |
+| UAT-10 | ファイル読み取り | ✅ PASS | ツール実行ログ確認 |
+| UAT-11 | ファイル書き込み（承認）| 🔲 手動待ち | stdin競合のため手動 |
+| UAT-12 | コマンド実行（承認）| 🔲 手動待ち | stdin競合のため手動 |
+| UAT-13 | grep 検索 | ✅ PASS | ファイル名・行番号付き |
+| UAT-14 | ファイル検索 | ✅ PASS | *.py 検索成功 |
+| UAT-15 | ディレクトリ一覧 | ✅ PASS | src/ + ファイル一覧 |
+| UAT-16 | ストリーミング | ✅ PASS | 機能動作確認 |
+| UAT-17 | ストリーミング無効 | ✅ PASS | 一括表示確認 |
+| UAT-18 | Coordinator 起動 | ✅ PASS | エラーなし起動 |
+| UAT-19 | SEARCH インテント | ✅ PASS | `[Searcher] dispatched` 確認 |
+| UAT-20 | CODE インテント | 🔲 手動待ち | write_file 承認が必要 |
+| UAT-21 | EXECUTE インテント | 🔲 手動待ち | execute_command 承認が必要 |
+| UAT-22 | MULTI インテント | 🔲 手動待ち | 複数承認が必要 |
+
+**自動化: 16/22 PASS ✅**  
+**手動実施待ち: 4件（UAT-11, 12, 20, 21, 22 — うち承認フローを要するもの）**
+
+## 注意事項
+
+- **UAT-11, 12, 20, 21, 22 の手動テスト**: `uv run ptsu chat` を端末で直接起動し、承認プロンプトに手動で Y/N を入力すること
+- UAT-16 の視覚的ストリーミング確認: 端末接続時のみ逐次表示が確認可能
+- 自動化テストでは `--no-stream` を使用（非同期出力のキャプチャ安定化のため）
