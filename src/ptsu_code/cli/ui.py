@@ -4,6 +4,8 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
 
+from ptsu_code.agent.sub_agents.base import AgentRole
+
 console = Console()
 
 
@@ -140,6 +142,25 @@ def show_tool_result(tool_name: str, success: bool, output: str = "", error: str
     else:
         error_preview = error[:100] if error else "Unknown error"
         console.print(f"[dim]✗[/dim] [red]{tool_name}[/red]: {error_preview}")
+
+
+def show_coordinator_dispatch(role: AgentRole, agent_name: str, intent_label: str = "") -> None:
+    """Coordinatorのディスパッチ情報を表示する。
+
+    Args:
+        role: 選択されたAgentRole
+        agent_name: Sub-agentの名前
+        intent_label: 意図ラベル（オプション）
+    """
+    role_styles = {
+        AgentRole.SEARCHER: "cyan",
+        AgentRole.CODER: "green",
+        AgentRole.EXECUTOR: "yellow",
+        AgentRole.GENERAL: "blue",
+    }
+    color = role_styles.get(role, "white")
+    label = f" ({intent_label})" if intent_label else ""
+    console.print(f"[bold {color}][{agent_name}][/bold {color}]{label} dispatched")
 
 
 def show_tool_approval_request(tool_name: str, args: dict) -> str:

@@ -5,13 +5,20 @@ from typing import Annotated
 import typer
 
 from ptsu_code import __version__
+from ptsu_code.agent.coordinator import Coordinator
+from ptsu_code.agent.intent import IntentClassifier
 from ptsu_code.agent.prompts import SystemPrompts
 from ptsu_code.agent.runtime import AgentRuntime, AgentSession
+from ptsu_code.agent.sub_agents.base import AgentRole
+from ptsu_code.agent.sub_agents.coder import CoderAgent
+from ptsu_code.agent.sub_agents.executor import ExecutorAgent
+from ptsu_code.agent.sub_agents.searcher import SearcherAgent
 from ptsu_code.agent.tools.command_tool import CommandExecutionTool
 from ptsu_code.agent.tools.file_tools import FileReadTool, FileWriteTool
 from ptsu_code.agent.tools.search_tools import FindTool, GrepTool, ListDirTool
 from ptsu_code.cli.prompt import UserPrompt
 from ptsu_code.cli.ui import (
+    show_coordinator_dispatch,
     show_error,
     show_info,
     show_message,
@@ -33,12 +40,32 @@ app = typer.Typer(
 )
 
 
+def _build_coordinator(runtime: AgentRuntime) -> Coordinator:
+    """Coordinatorインスタンスを構築する。
+
+    Args:
+        runtime: AgentRuntimeインスタンス
+
+    Returns:
+        Coordinatorインスタンス
+    """
+    classifier = IntentClassifier(runtime.provider)
+    agents = {
+        AgentRole.SEARCHER: SearcherAgent(),
+        AgentRole.CODER: CoderAgent(),
+        AgentRole.EXECUTOR: ExecutorAgent(),
+        AgentRole.GENERAL: SearcherAgent(),
+    }
+    return Coordinator(runtime=runtime, classifier=classifier, agents=agents)
+
+
 @app.command()
 def chat(
     verbose: Annotated[bool, typer.Option("--verbose", "-v", help="Enable verbose output")] = False,
     llm: Annotated[bool, typer.Option("--llm/--no-llm", help="Enable LLM mode")] = True,
     provider: Annotated[str, typer.Option(help="LLM provider (openai or anthropic)")] = "openai",
     stream: Annotated[bool, typer.Option("--stream/--no-stream", help="Enable streaming responses")] = True,
+    coordinator: Annotated[bool, typer.Option("--coordinator/--no-coordinator", help="Enable Coordinator Mode")] = False,
 ) -> None:
     """対話モードを起動する。"""
     try:
@@ -140,7 +167,14 @@ def chat(
                         elif event == "end":
                             show_streaming_end()
 
-                    if stream:
+                    if coordinator:
+                        coord = _build_coordinator(runtime)
+                        response = coord.process(
+                            user_input,
+                            on_dispatch=show_coordinator_dispatch,
+                        )
+                        show_message("assistant", response)
+                    elif stream:
                         response = runtime.run_loop_stream(
                             session, user_input, request_approval, show_progress, handle_stream
                         )
