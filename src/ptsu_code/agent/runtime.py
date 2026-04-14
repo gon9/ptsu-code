@@ -258,10 +258,13 @@ class AgentRuntime:
                         error=result.error,
                     )
 
+                raw_content = str(result.output if result.success else result.error)
+                if len(raw_content) > 2000:
+                    raw_content = raw_content[:1900] + f"\n... (truncated, {len(raw_content)} chars total)"
                 results.append(
                     Message(
                         role="tool",
-                        content=str(result.output if result.success else result.error),
+                        content=raw_content,
                         tool_call_id=tool_call["id"],
                         name=function_name,
                     )

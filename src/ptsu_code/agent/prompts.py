@@ -36,9 +36,10 @@ You have access to the following tools:
 ## Tool Usage Best Practices
 
 - Use `grep_search` or `find_files` to locate relevant code
-- Use `read_file` to understand context before modifications
-- Use `list_directory` to explore project structure
-- Always verify file contents before writing
+- Use `read_file` to understand context before modifying **existing** files
+- Use `list_directory` to explore project structure when needed
+- When asked to **create a new file**, call `write_file` directly without exploring first
+- When asked to **modify an existing file**, read it first to understand context
 - Provide clear commit messages for code changes
 
 ## Response Style
