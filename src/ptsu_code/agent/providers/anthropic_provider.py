@@ -11,7 +11,7 @@ from .base import LLMProvider, LLMResponse, LLMStreamChunk
 class AnthropicProvider(LLMProvider):
     """Anthropic APIプロバイダー。"""
 
-    def __init__(self, api_key: str, default_model: str = "claude-3-5-sonnet-20241022") -> None:
+    def __init__(self, api_key: str, default_model: str = "claude-sonnet-4-5") -> None:
         """初期化。
 
         Args:

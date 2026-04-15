@@ -109,7 +109,7 @@ class AgentRuntime:
                 )
             self.provider = AnthropicProvider(
                 api_key=api_key,
-                default_model=model or "claude-3-5-sonnet-20241022",
+                default_model=model or settings.anthropic_model,
             )
         else:
             api_key = api_key or settings.openai_api_key
@@ -120,7 +120,7 @@ class AgentRuntime:
                 )
             self.provider = OpenAIProvider(
                 api_key=api_key,
-                default_model=model or "gpt-4o-mini",
+                default_model=model or settings.openai_model,
             )
 
     def run_turn(self, session: AgentSession) -> Any:

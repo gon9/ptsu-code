@@ -55,7 +55,7 @@ class TestAnthropicProviderInit:
     def test_init_sets_default_model(self, mock_anthropic_client):
         """デフォルトモデルが設定されることを確認する。"""
         p = AnthropicProvider(api_key="key")
-        assert p.default_model == "claude-3-5-sonnet-20241022"
+        assert p.default_model == "claude-sonnet-4-5"
 
     def test_init_custom_model(self, mock_anthropic_client):
         """カスタムモデルが設定されることを確認する。"""
