@@ -11,7 +11,7 @@ from .base import LLMProvider, LLMResponse, LLMStreamChunk
 class OpenAIProvider(LLMProvider):
     """OpenAI APIプロバイダー。"""
 
-    def __init__(self, api_key: str, default_model: str = "gpt-4o") -> None:
+    def __init__(self, api_key: str, default_model: str = "gpt-5-mini") -> None:
         """初期化。
 
         Args:

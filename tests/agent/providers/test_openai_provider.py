@@ -59,7 +59,7 @@ class TestOpenAIProviderInit:
     def test_init_sets_default_model(self, mock_openai_client):
         """デフォルトモデルが設定されることを確認する。"""
         p = OpenAIProvider(api_key="key")
-        assert p.default_model == "gpt-4o"
+        assert p.default_model == "gpt-5-mini"
 
     def test_init_custom_model(self, mock_openai_client):
         """カスタムモデルが設定されることを確認する。"""
@@ -119,7 +119,7 @@ class TestOpenAIProviderChat:
         mock_openai_client.chat.completions.create.return_value = _make_chat_response("ok")
         provider.chat([{"role": "user", "content": "msg"}], model=None)
         call_kwargs = mock_openai_client.chat.completions.create.call_args[1]
-        assert call_kwargs["model"] == "gpt-4o"
+        assert call_kwargs["model"] == "gpt-5-mini"
 
     def test_chat_empty_content_returns_empty_string(self, provider, mock_openai_client):
         """contentがNoneのとき空文字列が返されることを確認する。"""
