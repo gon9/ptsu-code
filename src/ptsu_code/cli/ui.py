@@ -1,6 +1,6 @@
 """Rich UIコンポーネント。"""
 
-from rich.console import Console
+from rich.console import Console, Group
 from rich.panel import Panel
 from rich.text import Text
 
@@ -173,26 +173,22 @@ def show_tool_approval_request(tool_name: str, args: dict) -> str:
     Returns:
         ユーザーの入力 ('y', 'n', 'a')
     """
-    from rich.panel import Panel
+    from rich.markup import escape
     from rich.table import Table
 
     # 引数を見やすく整形
     args_table = Table(show_header=False, box=None, padding=(0, 1))
     for key, value in args.items():
-        # 長い値は省略
         value_str = str(value)
         if len(value_str) > 100:
             value_str = value_str[:97] + "..."
-        args_table.add_row(f"[bold]{key}[/bold]:", value_str)
+        args_table.add_row(f"[bold]{escape(key)}[/bold]:", escape(value_str))
 
     panel = Panel(
-        Text.assemble(
-            ("Tool: ", "bold"),
-            (tool_name, "yellow bold"),
-            "\n\n",
+        Group(
+            Text.assemble(("Tool: ", "bold"), (tool_name, "yellow bold")),
             args_table,
-            "\n\n",
-            ("[Y]es / [N]o / [A]lways approve this tool", "dim"),
+            Text("[Y]es / [N]o / [A]lways approve this tool", style="dim"),
         ),
         title="[bold red]⚠ Tool Approval Required[/bold red]",
         border_style="yellow",
