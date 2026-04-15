@@ -25,7 +25,7 @@ class OpenAIProvider(LLMProvider):
         self,
         messages: list[dict[str, Any]],
         tools: list[dict[str, Any]] | None = None,
-        temperature: float = 0.7,
+        temperature: float | None = None,
         model: str | None = None,
     ) -> LLMResponse:
         """チャット補完を実行する。
@@ -33,18 +33,21 @@ class OpenAIProvider(LLMProvider):
         Args:
             messages: メッセージリスト
             tools: ツール定義リスト
-            temperature: 温度パラメータ
+            temperature: 温度パラメータ。Noneの場合はAPIのデフォルト値を使用
             model: モデル名
 
         Returns:
             LLMレスポンス
         """
-        response = self.client.chat.completions.create(
-            model=model or self.default_model,
-            messages=messages,  # type: ignore
-            tools=tools,  # type: ignore
-            temperature=temperature,
-        )
+        kwargs: dict[str, Any] = {
+            "model": model or self.default_model,
+            "messages": messages,
+        }
+        if tools:
+            kwargs["tools"] = tools
+        if temperature is not None:
+            kwargs["temperature"] = temperature
+        response = self.client.chat.completions.create(**kwargs)  # type: ignore
 
         message = response.choices[0].message
         tool_calls = None
@@ -62,7 +65,7 @@ class OpenAIProvider(LLMProvider):
         self,
         messages: list[dict[str, Any]],
         tools: list[dict[str, Any]] | None = None,
-        temperature: float = 0.7,
+        temperature: float | None = None,
         model: str | None = None,
     ) -> Iterator[LLMStreamChunk]:
         """ストリーミングでチャット補完を実行する。
@@ -70,23 +73,22 @@ class OpenAIProvider(LLMProvider):
         Args:
             messages: メッセージリスト
             tools: ツール定義リスト
-            temperature: 温度パラメータ
+            temperature: 温度パラメータ。Noneの場合はAPIのデフォルト値を使用
             model: モデル名
 
         Yields:
             ストリーミングチャンク
         """
-        model = model or self.default_model
-
         kwargs: dict[str, Any] = {
-            "model": model,
+            "model": model or self.default_model,
             "messages": messages,
-            "temperature": temperature,
             "stream": True,
         }
 
         if tools:
             kwargs["tools"] = tools
+        if temperature is not None:
+            kwargs["temperature"] = temperature
 
         stream = self.client.chat.completions.create(**kwargs)
 

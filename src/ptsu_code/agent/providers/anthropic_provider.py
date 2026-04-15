@@ -71,7 +71,7 @@ class AnthropicProvider(LLMProvider):
         self,
         messages: list[dict[str, Any]],
         tools: list[dict[str, Any]] | None = None,
-        temperature: float = 0.7,
+        temperature: float | None = None,
         model: str | None = None,
     ) -> LLMResponse:
         """チャット補完を実行する。
@@ -91,9 +91,10 @@ class AnthropicProvider(LLMProvider):
         kwargs: dict[str, Any] = {
             "model": model or self.default_model,
             "messages": converted_messages,
-            "temperature": temperature,
             "max_tokens": 4096,
         }
+        if temperature is not None:
+            kwargs["temperature"] = temperature
 
         if system_prompt:
             kwargs["system"] = system_prompt
@@ -136,7 +137,7 @@ class AnthropicProvider(LLMProvider):
         self,
         messages: list[dict[str, Any]],
         tools: list[dict[str, Any]] | None = None,
-        temperature: float = 0.7,
+        temperature: float | None = None,
         model: str | None = None,
     ) -> Iterator[LLMStreamChunk]:
         """ストリーミングでチャット補完を実行する。
@@ -160,9 +161,10 @@ class AnthropicProvider(LLMProvider):
             "model": model,
             "messages": converted_messages,
             "max_tokens": 4096,
-            "temperature": temperature,
             "stream": True,
         }
+        if temperature is not None:
+            kwargs["temperature"] = temperature
 
         if system_prompt:
             kwargs["system"] = system_prompt

@@ -60,7 +60,7 @@ class AgentSession:
     approval_manager: ApprovalManager = field(default_factory=ApprovalManager)
     model: str | None = None
     max_turns: int = 10
-    temperature: float = 0.7
+    temperature: float | None = None
 
     def add_message(self, role: str, content: str, **kwargs: Any) -> None:
         """メッセージを追加する。

@@ -33,7 +33,7 @@ class LLMProvider(ABC):
         self,
         messages: list[dict[str, Any]],
         tools: list[dict[str, Any]] | None = None,
-        temperature: float = 0.7,
+        temperature: float | None = None,
         model: str | None = None,
     ) -> LLMResponse:
         """チャット補完を実行する。
@@ -53,7 +53,7 @@ class LLMProvider(ABC):
         self,
         messages: list[dict[str, Any]],
         tools: list[dict[str, Any]] | None = None,
-        temperature: float = 0.7,
+        temperature: float | None = None,
         model: str | None = None,
     ) -> Iterator[LLMStreamChunk]:
         """ストリーミングでチャット補完を実行する。

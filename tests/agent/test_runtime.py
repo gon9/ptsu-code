@@ -82,9 +82,9 @@ class TestAgentSession:
         assert session.max_turns == 10
 
     def test_default_temperature(self):
-        """デフォルトtemperatureが0.7であることを確認する。"""
+        """デフォルトtemperatureがNone（モデルデフォルト使用）であることを確認する。"""
         session = AgentSession()
-        assert session.temperature == 0.7
+        assert session.temperature is None
 
     def test_add_message_with_kwargs(self):
         """kwargsを渡してadd_messageが動作することを確認する。"""
