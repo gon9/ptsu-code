@@ -105,6 +105,7 @@ def chat(
                 session.tool_registry.register(GrepTool())
                 session.tool_registry.register(FindTool())
                 session.tool_registry.register(ListDirTool())
+                runtime.session_tool_registry = session.tool_registry
 
                 system_prompt = SystemPrompts.coding_assistant()
                 session.add_message("system", system_prompt)
