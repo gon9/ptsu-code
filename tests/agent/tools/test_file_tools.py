@@ -14,8 +14,11 @@ class TestFileReadTool:
         definition = tool.definition
 
         assert definition.name == "read_file"
-        assert len(definition.parameters) == 1
-        assert definition.parameters[0].name == "path"
+        assert len(definition.parameters) == 3
+        param_names = {p.name for p in definition.parameters}
+        assert "path" in param_names
+        assert "offset" in param_names
+        assert "limit" in param_names
 
     def test_read_existing_file(self, tmp_path):
         """既存ファイルが読み込めることを確認する。"""
@@ -26,7 +29,8 @@ class TestFileReadTool:
         result = tool.execute(path=str(test_file))
 
         assert result.success is True
-        assert result.output == "Hello, World!"
+        assert "Hello, World!" in result.output
+        assert "Lines 1-" in result.output
         assert result.error is None
 
     def test_read_nonexistent_file(self, tmp_path):
