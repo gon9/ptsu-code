@@ -4,6 +4,7 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 from ptsu_code.agent.sub_agents.base import AgentRole, SubAgent, SubAgentConfig
+from ptsu_code.config import get_model
 
 if TYPE_CHECKING:
     from ptsu_code.agent.runtime import AgentRuntime
@@ -26,6 +27,8 @@ class SearcherAgent(SubAgent):
             allowed_tools=["read_file", "grep_search", "find_files", "list_directory"],
             max_turns=10,
             temperature=None,
+            provider="openai",
+            model_tier="fast",
         )
 
     def run(
@@ -52,6 +55,7 @@ class SearcherAgent(SubAgent):
         from ptsu_code.agent.tools.registry import ToolRegistry
 
         cfg = self.config
+        agent_runtime = self._get_runtime(runtime)
 
         restricted_registry = ToolRegistry()
         for tool_name in cfg.allowed_tools:
@@ -61,7 +65,7 @@ class SearcherAgent(SubAgent):
 
         session = AgentSession(
             tool_registry=restricted_registry,
-            model=None,
+            model=get_model(agent_runtime.provider_name, cfg.model_tier),
             max_turns=cfg.max_turns,
             temperature=cfg.temperature,
         )
@@ -74,7 +78,7 @@ class SearcherAgent(SubAgent):
             context_text = "\n".join(context_lines)
             session.add_message("system", f"Context:\n{context_text}")
 
-        return runtime.run_loop(session, message, request_approval_callback, show_progress_callback)
+        return agent_runtime.run_loop(session, message, request_approval_callback, show_progress_callback)
 
     def _get_system_prompt(self) -> str:
         """システムプロンプトを返す。"""

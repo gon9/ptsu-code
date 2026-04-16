@@ -4,7 +4,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import Any
 
-from ptsu_code.config import settings
+from ptsu_code.config import get_model, settings
 from ptsu_code.exceptions import PTSUError
 
 from .approval import ApprovalManager
@@ -109,7 +109,7 @@ class AgentRuntime:
                 )
             self.provider = AnthropicProvider(
                 api_key=api_key,
-                default_model=model or settings.anthropic_model,
+                default_model=model or get_model("anthropic", "smart"),
             )
         else:
             api_key = api_key or settings.openai_api_key
@@ -120,7 +120,7 @@ class AgentRuntime:
                 )
             self.provider = OpenAIProvider(
                 api_key=api_key,
-                default_model=model or settings.openai_model,
+                default_model=model or get_model("openai", "fast"),
             )
 
     def run_turn(self, session: AgentSession) -> Any:

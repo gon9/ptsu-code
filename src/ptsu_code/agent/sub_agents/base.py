@@ -30,10 +30,30 @@ class SubAgentConfig:
     allowed_tools: list[str] = field(default_factory=list)
     max_turns: int = 10
     temperature: float | None = None
+    provider: str | None = None
+    model_tier: str = "fast"
 
 
 class SubAgent(ABC):
     """Sub-agentの基底クラス。"""
+
+    def _get_runtime(self, shared_runtime: "AgentRuntime") -> "AgentRuntime":
+        """Sub-agentの設定に基づいてRuntimeを返す。
+
+        Sub-agentが異なるプロバイダーを指定している場合は新しいRuntimeを生成する。
+
+        Args:
+            shared_runtime: Coordinatorから渡された共有Runtime
+
+        Returns:
+            使用するAgentRuntime
+        """
+        from ptsu_code.agent.runtime import AgentRuntime
+
+        cfg = self.config
+        if cfg.provider and cfg.provider != shared_runtime.provider_name:
+            return AgentRuntime(provider=cfg.provider)
+        return shared_runtime
 
     @property
     @abstractmethod

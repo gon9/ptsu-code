@@ -81,6 +81,7 @@ class TestCoderAgentRun:
         agent = CoderAgent()
         runtime = MagicMock()
         runtime.run_loop.return_value = "Added new function to src/main.py"
+        runtime.provider_name = "anthropic"
         runtime.session_tool_registry = MagicMock()
         runtime.session_tool_registry.get.return_value = None
 
@@ -94,6 +95,7 @@ class TestCoderAgentRun:
         agent = CoderAgent()
         runtime = MagicMock()
         runtime.run_loop.return_value = "done"
+        runtime.provider_name = "anthropic"
         runtime.session_tool_registry = MagicMock()
         runtime.session_tool_registry.get.return_value = None
 
@@ -108,6 +110,7 @@ class TestCoderAgentRun:
         agent = CoderAgent()
         runtime = MagicMock()
         runtime.run_loop.return_value = "done"
+        runtime.provider_name = "anthropic"
         runtime.session_tool_registry = MagicMock()
         runtime.session_tool_registry.get.return_value = None
 
@@ -119,6 +122,7 @@ class TestCoderAgentRun:
         agent = CoderAgent()
         runtime = MagicMock()
         runtime.run_loop.return_value = "done"
+        runtime.provider_name = "anthropic"
         runtime.session_tool_registry = MagicMock()
         runtime.session_tool_registry.get.return_value = None
 
@@ -142,6 +146,7 @@ class TestCoderAgentRun:
         agent = CoderAgent()
         runtime = MagicMock()
         runtime.run_loop.return_value = f"done: {message}"
+        runtime.provider_name = "anthropic"
         runtime.session_tool_registry = MagicMock()
         runtime.session_tool_registry.get.return_value = None
 

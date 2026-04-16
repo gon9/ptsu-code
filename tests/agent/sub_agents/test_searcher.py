@@ -78,6 +78,7 @@ class TestSearcherAgentRun:
         agent = SearcherAgent()
         runtime = MagicMock()
         runtime.run_loop.return_value = "Found: src/main.py line 42"
+        runtime.provider_name = "openai"
         runtime.session_tool_registry = MagicMock()
         runtime.session_tool_registry.get.return_value = None
 
@@ -91,6 +92,7 @@ class TestSearcherAgentRun:
         agent = SearcherAgent()
         runtime = MagicMock()
         runtime.run_loop.return_value = "result"
+        runtime.provider_name = "openai"
         runtime.session_tool_registry = MagicMock()
         runtime.session_tool_registry.get.return_value = None
 
@@ -105,6 +107,7 @@ class TestSearcherAgentRun:
         agent = SearcherAgent()
         runtime = MagicMock()
         runtime.run_loop.return_value = "result"
+        runtime.provider_name = "openai"
         runtime.session_tool_registry = MagicMock()
         runtime.session_tool_registry.get.return_value = None
 
@@ -116,6 +119,7 @@ class TestSearcherAgentRun:
         agent = SearcherAgent()
         runtime = MagicMock()
         runtime.run_loop.return_value = "result"
+        runtime.provider_name = "openai"
         runtime.session_tool_registry = MagicMock()
         runtime.session_tool_registry.get.return_value = None
 
@@ -140,6 +144,7 @@ class TestSearcherAgentRun:
         agent = SearcherAgent()
         runtime = MagicMock()
         runtime.run_loop.return_value = f"result for: {message}"
+        runtime.provider_name = "openai"
         runtime.session_tool_registry = MagicMock()
         runtime.session_tool_registry.get.return_value = None
 

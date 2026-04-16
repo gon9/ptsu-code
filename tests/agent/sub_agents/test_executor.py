@@ -76,6 +76,7 @@ class TestExecutorAgentRun:
         agent = ExecutorAgent()
         runtime = MagicMock()
         runtime.run_loop.return_value = "Tests passed: 171/171"
+        runtime.provider_name = "openai"
         runtime.session_tool_registry = MagicMock()
         runtime.session_tool_registry.get.return_value = None
 
@@ -89,6 +90,7 @@ class TestExecutorAgentRun:
         agent = ExecutorAgent()
         runtime = MagicMock()
         runtime.run_loop.return_value = "done"
+        runtime.provider_name = "openai"
         runtime.session_tool_registry = MagicMock()
         runtime.session_tool_registry.get.return_value = None
 
@@ -103,6 +105,7 @@ class TestExecutorAgentRun:
         agent = ExecutorAgent()
         runtime = MagicMock()
         runtime.run_loop.return_value = "done"
+        runtime.provider_name = "openai"
         runtime.session_tool_registry = MagicMock()
         runtime.session_tool_registry.get.return_value = None
 
@@ -114,6 +117,7 @@ class TestExecutorAgentRun:
         agent = ExecutorAgent()
         runtime = MagicMock()
         runtime.run_loop.return_value = "done"
+        runtime.provider_name = "openai"
         runtime.session_tool_registry = MagicMock()
         runtime.session_tool_registry.get.return_value = None
 
@@ -137,6 +141,7 @@ class TestExecutorAgentRun:
         agent = ExecutorAgent()
         runtime = MagicMock()
         runtime.run_loop.return_value = f"executed: {message}"
+        runtime.provider_name = "openai"
         runtime.session_tool_registry = MagicMock()
         runtime.session_tool_registry.get.return_value = None
 
