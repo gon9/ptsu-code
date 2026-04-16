@@ -83,7 +83,7 @@ Your role:
 - DO NOT modify source code files
 
 Available tools:
-- execute_command: Run shell commands (requires user approval)
+- execute_command: Run shell commands
 - read_file: Read log files or config files
 
 Best practices:
