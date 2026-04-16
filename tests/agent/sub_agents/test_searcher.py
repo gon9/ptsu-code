@@ -79,7 +79,7 @@ class TestSearcherAgentRun:
         runtime = MagicMock()
         runtime.run_loop.return_value = "Found: src/main.py line 42"
         runtime.session_tool_registry = MagicMock()
-        runtime.session_tool_registry.get_tool.return_value = None
+        runtime.session_tool_registry.get.return_value = None
 
         result = agent.run(runtime, "find the main file")
 
@@ -92,7 +92,7 @@ class TestSearcherAgentRun:
         runtime = MagicMock()
         runtime.run_loop.return_value = "result"
         runtime.session_tool_registry = MagicMock()
-        runtime.session_tool_registry.get_tool.return_value = None
+        runtime.session_tool_registry.get.return_value = None
 
         agent.run(runtime, "search for User class")
 
@@ -106,7 +106,7 @@ class TestSearcherAgentRun:
         runtime = MagicMock()
         runtime.run_loop.return_value = "result"
         runtime.session_tool_registry = MagicMock()
-        runtime.session_tool_registry.get_tool.return_value = None
+        runtime.session_tool_registry.get.return_value = None
 
         result = agent.run(runtime, "find config", context={"cwd": "/project", "language": "python"})
         assert result == "result"
@@ -117,7 +117,7 @@ class TestSearcherAgentRun:
         runtime = MagicMock()
         runtime.run_loop.return_value = "result"
         runtime.session_tool_registry = MagicMock()
-        runtime.session_tool_registry.get_tool.return_value = None
+        runtime.session_tool_registry.get.return_value = None
 
 
         with patch("ptsu_code.agent.runtime.AgentSession") as mock_session_class:
@@ -141,7 +141,7 @@ class TestSearcherAgentRun:
         runtime = MagicMock()
         runtime.run_loop.return_value = f"result for: {message}"
         runtime.session_tool_registry = MagicMock()
-        runtime.session_tool_registry.get_tool.return_value = None
+        runtime.session_tool_registry.get.return_value = None
 
         result = agent.run(runtime, message)
         assert result == f"result for: {message}"

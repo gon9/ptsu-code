@@ -77,7 +77,7 @@ class TestExecutorAgentRun:
         runtime = MagicMock()
         runtime.run_loop.return_value = "Tests passed: 171/171"
         runtime.session_tool_registry = MagicMock()
-        runtime.session_tool_registry.get_tool.return_value = None
+        runtime.session_tool_registry.get.return_value = None
 
         result = agent.run(runtime, "run the tests")
 
@@ -90,7 +90,7 @@ class TestExecutorAgentRun:
         runtime = MagicMock()
         runtime.run_loop.return_value = "done"
         runtime.session_tool_registry = MagicMock()
-        runtime.session_tool_registry.get_tool.return_value = None
+        runtime.session_tool_registry.get.return_value = None
 
         agent.run(runtime, "run uv run pytest")
 
@@ -104,7 +104,7 @@ class TestExecutorAgentRun:
         runtime = MagicMock()
         runtime.run_loop.return_value = "done"
         runtime.session_tool_registry = MagicMock()
-        runtime.session_tool_registry.get_tool.return_value = None
+        runtime.session_tool_registry.get.return_value = None
 
         result = agent.run(runtime, "build docker image", context={"cwd": "/project"})
         assert result == "done"
@@ -115,7 +115,7 @@ class TestExecutorAgentRun:
         runtime = MagicMock()
         runtime.run_loop.return_value = "done"
         runtime.session_tool_registry = MagicMock()
-        runtime.session_tool_registry.get_tool.return_value = None
+        runtime.session_tool_registry.get.return_value = None
 
         with patch("ptsu_code.agent.runtime.AgentSession") as mock_session_class:
             mock_session = MagicMock()
@@ -138,7 +138,7 @@ class TestExecutorAgentRun:
         runtime = MagicMock()
         runtime.run_loop.return_value = f"executed: {message}"
         runtime.session_tool_registry = MagicMock()
-        runtime.session_tool_registry.get_tool.return_value = None
+        runtime.session_tool_registry.get.return_value = None
 
         result = agent.run(runtime, message)
         assert result == f"executed: {message}"

@@ -51,7 +51,7 @@ class ExecutorAgent(SubAgent):
 
         restricted_registry = ToolRegistry()
         for tool_name in cfg.allowed_tools:
-            tool = runtime.session_tool_registry.get_tool(tool_name) if hasattr(runtime, "session_tool_registry") else None
+            tool = runtime.session_tool_registry.get(tool_name) if hasattr(runtime, "session_tool_registry") else None
             if tool is not None:
                 restricted_registry.register(tool)
 
