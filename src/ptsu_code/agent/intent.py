@@ -134,7 +134,7 @@ class IntentClassifier:
         messages.append({"role": "user", "content": _INTENT_PROMPT.format(user_message=user_message)})
 
         try:
-            response = self.provider.chat(messages=messages, temperature=0.0)
+            response = self.provider.chat(messages=messages, temperature=None)
             return self._parse_response(response.content)
         except Exception:
             return self._fallback_result(user_message)

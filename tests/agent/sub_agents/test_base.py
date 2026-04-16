@@ -79,7 +79,7 @@ class TestSubAgentConfig:
             system_prompt="prompt",
         )
         assert cfg.max_turns == 10
-        assert cfg.temperature == 0.7
+        assert cfg.temperature is None
 
     def test_config_custom_values(self):
         """カスタム値が正しく設定されることを確認する。"""

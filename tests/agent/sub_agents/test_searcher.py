@@ -38,9 +38,9 @@ class TestSearcherAgentConfig:
         assert "execute_command" not in allowed
 
     def test_config_temperature(self):
-        """temperatureが低め（0.3）であることを確認する。"""
+        """temperatureがNone（モデルデフォルト使用）であることを確認する。"""
         agent = SearcherAgent()
-        assert agent.config.temperature == 0.3
+        assert agent.config.temperature is None
 
     def test_config_max_turns(self):
         """max_turnsが5であることを確認する。"""

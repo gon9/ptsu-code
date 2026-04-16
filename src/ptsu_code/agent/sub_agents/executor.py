@@ -25,7 +25,7 @@ class ExecutorAgent(SubAgent):
             system_prompt=self._get_system_prompt(),
             allowed_tools=["execute_command", "read_file"],
             max_turns=5,
-            temperature=0.1,
+            temperature=None,
         )
 
     def run(

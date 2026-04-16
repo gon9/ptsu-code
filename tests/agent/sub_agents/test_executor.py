@@ -42,9 +42,9 @@ class TestExecutorAgentConfig:
         assert "grep_search" not in agent.config.allowed_tools
 
     def test_config_temperature(self):
-        """temperatureが0.1（最低温度）であることを確認する。"""
+        """temperatureがNone（モデルデフォルト使用）であることを確認する。"""
         agent = ExecutorAgent()
-        assert agent.config.temperature == 0.1
+        assert agent.config.temperature is None
 
     def test_config_max_turns(self):
         """max_turnsが5であることを確認する。"""

@@ -45,9 +45,9 @@ class TestCoderAgentConfig:
         assert "execute_command" not in agent.config.allowed_tools
 
     def test_config_temperature(self):
-        """temperatureが0.3であることを確認する。"""
+        """temperatureがNone（モデルデフォルト使用）であることを確認する。"""
         agent = CoderAgent()
-        assert agent.config.temperature == 0.3
+        assert agent.config.temperature is None
 
     def test_config_max_turns(self):
         """max_turnsが10であることを確認する。"""

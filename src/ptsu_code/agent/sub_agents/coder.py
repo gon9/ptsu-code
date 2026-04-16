@@ -25,7 +25,7 @@ class CoderAgent(SubAgent):
             system_prompt=self._get_system_prompt(),
             allowed_tools=["read_file", "write_file", "grep_search", "find_files", "list_directory"],
             max_turns=10,
-            temperature=0.3,
+            temperature=None,
         )
 
     def run(

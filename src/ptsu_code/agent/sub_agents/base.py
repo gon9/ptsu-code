@@ -28,7 +28,7 @@ class SubAgentConfig:
     system_prompt: str
     allowed_tools: list[str] = field(default_factory=list)
     max_turns: int = 10
-    temperature: float = 0.7
+    temperature: float | None = None
 
 
 class SubAgent(ABC):
