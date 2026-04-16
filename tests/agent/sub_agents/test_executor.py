@@ -47,9 +47,9 @@ class TestExecutorAgentConfig:
         assert agent.config.temperature is None
 
     def test_config_max_turns(self):
-        """max_turnsが5であることを確認する。"""
+        """max_turnsが10であることを確認する。"""
         agent = ExecutorAgent()
-        assert agent.config.max_turns == 5
+        assert agent.config.max_turns == 10
 
     def test_config_returns_subagentconfig_type(self):
         """configがSubAgentConfigを返すことを確認する。"""
