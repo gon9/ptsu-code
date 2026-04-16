@@ -173,6 +173,8 @@ def chat(
                         response = coord.process(
                             user_input,
                             on_dispatch=show_coordinator_dispatch,
+                            request_approval_callback=request_approval,
+                            show_progress_callback=show_progress,
                         )
                         show_message("assistant", response)
                     elif stream:

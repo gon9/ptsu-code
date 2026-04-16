@@ -1,6 +1,7 @@
 """Sub-agentの基底クラスと共通データ構造。"""
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import TYPE_CHECKING, Any
@@ -45,6 +46,8 @@ class SubAgent(ABC):
         runtime: "AgentRuntime",
         message: str,
         context: dict[str, Any] | None = None,
+        request_approval_callback: Callable | None = None,
+        show_progress_callback: Callable | None = None,
     ) -> str:
         """メッセージを処理して結果を返す。
 
@@ -52,6 +55,8 @@ class SubAgent(ABC):
             runtime: AgentRuntimeインスタンス
             message: ユーザーメッセージ
             context: コンテキスト情報（オプション）
+            request_approval_callback: ツール承認コールバック（オプション）
+            show_progress_callback: 進捗表示コールバック（オプション）
 
         Returns:
             処理結果

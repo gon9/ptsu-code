@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -53,6 +54,8 @@ class Coordinator:
         user_message: str,
         context: dict[str, Any] | None = None,
         on_dispatch: Any = None,
+        request_approval_callback: Callable | None = None,
+        show_progress_callback: Callable | None = None,
     ) -> str:
         """ユーザーメッセージを処理する。
 
@@ -64,6 +67,8 @@ class Coordinator:
             user_message: ユーザーメッセージ
             context: コンテキスト情報（オプション）
             on_dispatch: ディスパッチ時のコールバック fn(role, name)
+            request_approval_callback: ツール承認コールバック
+            show_progress_callback: 進捗表示コールバック
 
         Returns:
             処理結果
@@ -71,13 +76,13 @@ class Coordinator:
         intent = self.classifier.classify(user_message)
 
         if intent.primary == Intent.MULTI:
-            return self._handle_multi(user_message, intent, context, on_dispatch)
+            return self._handle_multi(user_message, intent, context, on_dispatch, request_approval_callback, show_progress_callback)
 
         agent = self._select_agent(intent.suggested_agent)
         if on_dispatch:
             on_dispatch(agent.config.role, agent.config.name)
 
-        return agent.run(self.runtime, user_message, context)
+        return agent.run(self.runtime, user_message, context, request_approval_callback, show_progress_callback)
 
     def _select_agent(self, role: AgentRole) -> SubAgent:
         """AgentRoleに対応するSub-agentを返す。
@@ -102,6 +107,8 @@ class Coordinator:
         intent: IntentResult,
         context: dict[str, Any] | None,
         on_dispatch: Any,
+        request_approval_callback: Callable | None = None,
+        show_progress_callback: Callable | None = None,
     ) -> str:
         """複数意図のリクエストを処理する。
 
@@ -113,6 +120,8 @@ class Coordinator:
             intent: 意図分類結果
             context: コンテキスト情報
             on_dispatch: ディスパッチ時のコールバック
+            request_approval_callback: ツール承認コールバック
+            show_progress_callback: 進捗表示コールバック
 
         Returns:
             統合された結果
@@ -137,14 +146,14 @@ class Coordinator:
             fallback = self._select_agent(intent.suggested_agent)
             if on_dispatch:
                 on_dispatch(fallback.config.role, fallback.config.name)
-            return fallback.run(self.runtime, message, context)
+            return fallback.run(self.runtime, message, context, request_approval_callback, show_progress_callback)
 
         results: list[str] = []
         for role in roles_to_run:
             agent = self._select_agent(role)
             if on_dispatch:
                 on_dispatch(agent.config.role, agent.config.name)
-            result = agent.run(self.runtime, message, context)
+            result = agent.run(self.runtime, message, context, request_approval_callback, show_progress_callback)
             results.append(f"[{agent.config.name}]\n{result}")
 
         return "\n\n".join(results)

@@ -1,5 +1,6 @@
 """コードベース調査・検索に特化したSub-agent。"""
 
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 from ptsu_code.agent.sub_agents.base import AgentRole, SubAgent, SubAgentConfig
@@ -32,6 +33,8 @@ class SearcherAgent(SubAgent):
         runtime: "AgentRuntime",
         message: str,
         context: dict[str, Any] | None = None,
+        request_approval_callback: Callable | None = None,
+        show_progress_callback: Callable | None = None,
     ) -> str:
         """コードベース検索タスクを実行する。
 
@@ -71,7 +74,7 @@ class SearcherAgent(SubAgent):
             context_text = "\n".join(context_lines)
             session.add_message("system", f"Context:\n{context_text}")
 
-        return runtime.run_loop(session, message)
+        return runtime.run_loop(session, message, request_approval_callback, show_progress_callback)
 
     def _get_system_prompt(self) -> str:
         """システムプロンプトを返す。"""

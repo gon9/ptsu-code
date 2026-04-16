@@ -113,7 +113,7 @@ class TestCoordinatorProcess:
         coord, _, agents = _make_coordinator(primary=Intent.SEARCH, suggested_agent=AgentRole.SEARCHER)
         ctx = {"cwd": "/project"}
         coord.process("find files", context=ctx)
-        agents[AgentRole.SEARCHER].run.assert_called_once_with(coord.runtime, "find files", ctx)
+        agents[AgentRole.SEARCHER].run.assert_called_once_with(coord.runtime, "find files", ctx, None, None)
 
 
 class TestCoordinatorMultiIntent:
