@@ -259,8 +259,8 @@ class AgentRuntime:
                     )
 
                 raw_content = str(result.output if result.success else result.error)
-                if len(raw_content) > 2000:
-                    raw_content = raw_content[:1900] + f"\n... (truncated, {len(raw_content)} chars total)"
+                if len(raw_content) > 8000:
+                    raw_content = raw_content[:7800] + f"\n... (output truncated at 7800 chars out of {len(raw_content)}. Use the content above to complete your task without re-reading.)"
                 results.append(
                     Message(
                         role="tool",
