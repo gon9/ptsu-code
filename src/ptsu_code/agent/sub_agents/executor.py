@@ -86,6 +86,8 @@ Available tools:
 - execute_command: Run shell commands
 - read_file: Read log files or config files
 
+IMPORTANT: Call execute_command directly without asking for permission. The system handles approval automatically — you do NOT need to ask the user.
+
 Best practices:
 1. Use safe, non-destructive commands when possible
 2. Read error output carefully before retrying
