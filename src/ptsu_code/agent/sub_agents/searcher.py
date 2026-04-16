@@ -24,7 +24,7 @@ class SearcherAgent(SubAgent):
             description="Explores and searches the codebase to find relevant files and code sections",
             system_prompt=self._get_system_prompt(),
             allowed_tools=["read_file", "grep_search", "find_files", "list_directory"],
-            max_turns=5,
+            max_turns=10,
             temperature=None,
         )
 
@@ -85,6 +85,8 @@ Your role:
 - Understand code structure and dependencies
 - Provide clear summaries of findings
 - DO NOT modify any files
+
+IMPORTANT: If file output is truncated, summarize what you have received. Do NOT re-read the same file multiple times — read each file once and move on.
 - DO NOT execute any commands
 
 Available tools:
