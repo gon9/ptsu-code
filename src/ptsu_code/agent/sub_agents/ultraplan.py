@@ -4,6 +4,7 @@ import time
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
+from ptsu_code.agent.context import mask_observations
 from ptsu_code.agent.sub_agents.base import AgentRole, SubAgent, SubAgentConfig
 from ptsu_code.agent.tools.plan_tools import ExitPlanModeTool, WritePlanTool
 from ptsu_code.config import get_model
@@ -218,19 +219,20 @@ class UltraPlanAgent(SubAgent):
             if len(session.tool_registry) > 0
             else None
         )
+        messages = mask_observations(session.get_messages())
 
         last_exc: Exception | None = None
         for attempt in range(_RATE_LIMIT_RETRIES + 1):
             try:
                 if thinking_budget and isinstance(runtime.provider, AnthropicProvider):
                     return runtime.provider.chat(
-                        messages=session.get_messages(),
+                        messages=messages,
                         tools=tools,
                         model=session.model,
                         thinking_budget=thinking_budget,
                     )
                 return runtime.provider.chat(
-                    messages=session.get_messages(),
+                    messages=messages,
                     tools=tools,
                     temperature=session.temperature,
                     model=session.model,
