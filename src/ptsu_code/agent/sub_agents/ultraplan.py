@@ -133,7 +133,8 @@ class UltraPlanAgent(SubAgent):
                     "thinking",
                 )
 
-            response = self._run_turn_with_thinking(agent_runtime, session, thinking_budget)
+            scaled_budget = self._scale_thinking_budget(thinking_budget, turn, cfg.max_turns)
+            response = self._run_turn_with_thinking(agent_runtime, session, scaled_budget)
 
             if response.tool_calls:
                 session.add_message(
@@ -161,6 +162,35 @@ class UltraPlanAgent(SubAgent):
                     return response.content
 
         return f"ULTRAPLAN reached max turns ({cfg.max_turns}) without completing. Last state: planning in progress."
+
+    def _scale_thinking_budget(
+        self,
+        base_budget: int | None,
+        turn: int,
+        max_turns: int,
+    ) -> int | None:
+        """ターン進行度に応じてthinking_budgetを段階的に削減する。
+
+        調査フェーズ（前半）は深い思考が必要なため予算をフルに使い、
+        計画作成・出力フェーズ（後半）は生成コストを抑えるため削減する。
+
+        Args:
+            base_budget: 基本thinking_budget（Noneの場合は変換なし）
+            turn: 現在のターン番号（0始まり）
+            max_turns: 最大ターン数
+
+        Returns:
+            スケール済みthinking_budget。後半はNone（無効化）
+        """
+        if base_budget is None or max_turns == 0:
+            return base_budget
+
+        ratio = turn / max_turns
+        if ratio < 0.33:
+            return base_budget
+        if ratio < 0.67:
+            return max(1024, base_budget // 2)
+        return None
 
     def _run_turn_with_thinking(
         self,
