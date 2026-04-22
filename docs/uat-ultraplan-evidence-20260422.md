@@ -102,6 +102,21 @@ tests/integration/test_ultraplan_flow.py::TestUATUP02UP03ApprovalFlow::test_up03
 **結果**: ULTRAPLAN の調査ループは安定して動作。`max_turns=30` でのタイムアウトは想定動作。
 プロンプトやツール使用パターンの最適化は今後の改善項目。
 
+### Run 4: エンドツーエンド完走 ✅
+
+**プロンプト改善後の再実行**
+
+| 項目 | 結果 |
+|---|---|
+| 🧠 ULTRAPLAN 起動表示 | ✅ 表示確認 |
+| ツール実行（調査フェーズ） | ✅ config.py を中心に調査 |
+| `write_plan(content=...)` | ✅ 内容付きで呼び出し成功 |
+| `exit_plan_mode` | ✅ マゼンタパネルでプラン表示 |
+| 承認ダイアログ | ✅ `y/n` 入力プロンプト表示 |
+| `y` で承認 (UAT-UP-02) | ✅ プランが承認され正常終了 |
+
+**生成されたプラン**: `config.py` リファクタリング計画（3フェーズ段階的移行、リスク分析、作業見積もり付き）
+
 ---
 
 ## 修正コミットログ
@@ -113,6 +128,7 @@ tests/integration/test_ultraplan_flow.py::TestUATUP02UP03ApprovalFlow::test_up03
 | `fix: Add exponential backoff retry for 429 rate limit` | rate limit リトライ追加 |
 | `feat: Scale thinking_budget by turn phase` | コスト最適化 |
 | `feat: Implement Observation Masking for context management` | input tokens 削減（JetBrains Research 2025 方式） |
+| `fix: Improve ULTRAPLAN system prompt to ensure write_plan is called with content` | プロンプト改善（フェーズ明示、引数例追加） |
 
 ---
 
@@ -121,7 +137,7 @@ tests/integration/test_ultraplan_flow.py::TestUATUP02UP03ApprovalFlow::test_up03
 | テスト ID | タイトル | 自動/手動 | 判定 | 備考 |
 |---|---|---|---|---|
 | UAT-UP-01 | キーワードトリガー | 自動+手動 | ✅ PASS | Coordinator → ULTRAPLAN dispatch 確認 |
-| UAT-UP-02 | 承認フロー (`y`) | 自動 | ✅ PASS | mock で検証済（手動は max_turns 到達のため未到達） |
+| UAT-UP-02 | 承認フロー (`y`) | 自動+手動 | ✅ PASS | mock 検証済 + Run 4 で実 API 手動確認済 |
 | UAT-UP-03 | 却下・再計画フロー (`n`) | 自動 | ✅ PASS | mock で検証済 |
 | UAT-UP-04 | `/tmp/ptsu-plan.md` 生成 | 自動 | ✅ PASS | `write_plan` + `exit_plan_mode` 検証済 |
 | UAT-UP-05 | 大文字/小文字キーワード | 自動 | ✅ PASS | 3 パターン検証済 |
