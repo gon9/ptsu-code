@@ -157,14 +157,98 @@ def show_coordinator_dispatch(role: AgentRole, agent_name: str, intent_label: st
         AgentRole.CODER: "green",
         AgentRole.EXECUTOR: "yellow",
         AgentRole.GENERAL: "blue",
+        AgentRole.ULTRAPLAN: "magenta",
     }
     color = role_styles.get(role, "white")
     label = f" ({intent_label})" if intent_label else ""
-    console.print(f"[bold {color}][{agent_name}][/bold {color}]{label} dispatched")
+    if role == AgentRole.ULTRAPLAN:
+        console.print(
+            f"[bold {color}]🧠 ULTRAPLAN[/bold {color}] — Deep investigation mode activated"
+        )
+    else:
+        console.print(f"[bold {color}][{agent_name}][/bold {color}]{label} dispatched")
+
+
+def show_ultraplan_progress(turn: int, elapsed: int) -> None:
+    """ULTRAPLANモードの思考中の進捗を表示する。
+
+    Args:
+        turn: 現在のターン数
+        elapsed: 経過秒数
+    """
+    mins, secs = divmod(elapsed, 60)
+    time_str = f"{mins}:{secs:02d}" if mins else f"0:{secs:02d}"
+    console.print(
+        f"[dim]🧠 Turn {turn} | {time_str} elapsed[/dim]",
+        end="\r",
+    )
+
+
+def show_plan_approval_request(args: dict) -> str:
+    """ULTRAPLAN用のプラン承認ダイアログを表示する。
+
+    Args:
+        args: exit_plan_modeの引数
+
+    Returns:
+        ユーザーの入力 ('y' or 'n')
+    """
+    from pathlib import Path
+
+    from rich.markdown import Markdown
+    from rich.markup import escape
+
+    summary = args.get("summary", "")
+    plan_path_str = args.get("plan_path", "/tmp/ptsu-plan.md")
+
+    plan_content: str | None = None
+    plan_path = Path(plan_path_str)
+    if plan_path.exists():
+        plan_content = plan_path.read_text(encoding="utf-8")
+
+    console.print()
+    if plan_content:
+        console.print(
+            Panel(
+                Markdown(plan_content),
+                title="[bold magenta]🧠 ULTRAPLAN — Plan Ready[/bold magenta]",
+                border_style="magenta",
+                padding=(1, 2),
+            )
+        )
+    else:
+        console.print(
+            Panel(
+                Text(escape(summary)),
+                title="[bold magenta]🧠 ULTRAPLAN — Plan Ready[/bold magenta]",
+                border_style="magenta",
+                padding=(1, 2),
+            )
+        )
+
+    console.print()
+    while True:
+        response = (
+            console.input(
+                "[bold]Approve this plan?[/bold] "
+                "([green]y[/green]=approve / [red]n[/red]=reject & continue planning): "
+            )
+            .lower()
+            .strip()
+        )
+        if response in ("y", "yes"):
+            console.print("[green]✔ Plan approved. Starting implementation...[/green]")
+            return "y"
+        if response in ("n", "no"):
+            console.print("[yellow]➩ Plan rejected. Continuing to refine...[/yellow]")
+            return "n"
+        console.print("[red]Please enter y or n.[/red]")
 
 
 def show_tool_approval_request(tool_name: str, args: dict) -> str:
     """ツール実行の承認を求める。
+
+    exit_plan_modeの場合は専用のプラン承認ダイアログを表示する。
 
     Args:
         tool_name: ツール名
@@ -173,6 +257,8 @@ def show_tool_approval_request(tool_name: str, args: dict) -> str:
     Returns:
         ユーザーの入力 ('y', 'n', 'a')
     """
+    if tool_name == "exit_plan_mode":
+        return show_plan_approval_request(args)
     from rich.markup import escape
     from rich.table import Table
 
@@ -207,3 +293,45 @@ def show_tool_approval_request(tool_name: str, args: dict) -> str:
             return "a"
         else:
             console.print("[red]Invalid input. Please enter y, n, or a.[/red]")
+
+
+def show_schedule_fired(task_id: str, prompt: str) -> None:
+    """スケジュールタスク発火を表示する。
+
+    Args:
+        task_id: 発火したタスクID
+        prompt: 実行されるプロンプト
+    """
+    from rich.markup import escape
+
+    console.print()
+    console.print(
+        Panel(
+            Text.assemble(
+                ("Task: ", "bold"),
+                (task_id, "cyan bold"),
+                "\n",
+                ("Prompt: ", "bold"),
+                escape(prompt),
+            ),
+            title="[bold blue]⏰ Scheduled Task Fired[/bold blue]",
+            border_style="blue",
+            padding=(0, 1),
+        )
+    )
+
+
+def show_schedule_created(task_id: str, human_schedule: str, prompt: str) -> None:
+    """スケジュール作成結果を表示する。
+
+    Args:
+        task_id: 作成されたタスクID
+        human_schedule: 人間可読なスケジュール文字列
+        prompt: プロンプト
+    """
+    from rich.markup import escape
+
+    console.print(
+        f"[green]✓[/green] Scheduled [cyan]{task_id}[/cyan] "
+        f"[dim]({escape(human_schedule)})[/dim]: {escape(prompt)}"
+    )

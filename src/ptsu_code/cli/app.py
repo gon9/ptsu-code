@@ -13,8 +13,15 @@ from ptsu_code.agent.sub_agents.base import AgentRole
 from ptsu_code.agent.sub_agents.coder import CoderAgent
 from ptsu_code.agent.sub_agents.executor import ExecutorAgent
 from ptsu_code.agent.sub_agents.searcher import SearcherAgent
+from ptsu_code.agent.sub_agents.ultraplan import UltraPlanAgent
 from ptsu_code.agent.tools.command_tool import CommandExecutionTool
 from ptsu_code.agent.tools.file_tools import FileReadTool, FileWriteTool
+from ptsu_code.agent.tools.plan_tools import ExitPlanModeTool, WritePlanTool
+from ptsu_code.agent.tools.schedule_tools import (
+    ScheduleCreateTool,
+    ScheduleDeleteTool,
+    ScheduleListTool,
+)
 from ptsu_code.agent.tools.search_tools import FindTool, GrepTool, ListDirTool
 from ptsu_code.cli.prompt import UserPrompt
 from ptsu_code.cli.ui import (
@@ -22,16 +29,19 @@ from ptsu_code.cli.ui import (
     show_error,
     show_info,
     show_message,
+    show_schedule_fired,
     show_streaming_chunk,
     show_streaming_end,
     show_streaming_start,
     show_tool_approval_request,
     show_tool_execution,
     show_tool_result,
+    show_ultraplan_progress,
     show_welcome,
 )
 from ptsu_code.config import settings
 from ptsu_code.exceptions import handle_exception
+from ptsu_code.scheduler import IdleTracker, SchedulerDaemon, ScheduleStore
 
 app = typer.Typer(
     name="ptsu",
@@ -55,6 +65,7 @@ def _build_coordinator(runtime: AgentRuntime) -> Coordinator:
         AgentRole.CODER: CoderAgent(),
         AgentRole.EXECUTOR: ExecutorAgent(),
         AgentRole.GENERAL: SearcherAgent(),
+        AgentRole.ULTRAPLAN: UltraPlanAgent(),
     }
     return Coordinator(runtime=runtime, classifier=classifier, agents=agents)
 
@@ -79,6 +90,8 @@ def chat(
 
         runtime = None
         session = None
+        scheduler: SchedulerDaemon | None = None
+        idle_tracker: IdleTracker | None = None
         use_llm = llm
 
         if use_llm:
@@ -99,22 +112,52 @@ def chat(
             if use_llm:
                 runtime = AgentRuntime(provider=provider_name)
                 session = AgentSession()
+                schedule_store = ScheduleStore()
                 session.tool_registry.register(FileReadTool())
                 session.tool_registry.register(FileWriteTool())
                 session.tool_registry.register(CommandExecutionTool())
                 session.tool_registry.register(GrepTool())
                 session.tool_registry.register(FindTool())
                 session.tool_registry.register(ListDirTool())
+                session.tool_registry.register(WritePlanTool())
+                session.tool_registry.register(ExitPlanModeTool())
+                session.tool_registry.register(ScheduleCreateTool(schedule_store))
+                session.tool_registry.register(ScheduleListTool(schedule_store))
+                session.tool_registry.register(ScheduleDeleteTool(schedule_store))
                 runtime.session_tool_registry = session.tool_registry
 
                 system_prompt = SystemPrompts.coding_assistant()
                 session.add_message("system", system_prompt)
                 show_info(f"LLM mode enabled ({provider_name}) with {len(session.tool_registry)} tools available.")
 
+                # スケジューラデーモンを起動
+                idle_tracker = IdleTracker()
+                scheduler = SchedulerDaemon(schedule_store, idle_tracker)
+                scheduler.start()
+                if schedule_store.count() > 0:
+                    show_info(f"Scheduler started with {schedule_store.count()} persisted task(s).")
+
         show_info("Chat mode started. Type your message and press Enter.")
 
+        pending_scheduled: list[tuple[str, str]] = []
+
         while True:
-            user_input = prompt.get_input("You > ")
+            # スケジューラから発火イベントをドレイン (idle前に集める)
+            if scheduler is not None:
+                _drain_scheduler(scheduler, pending_scheduled)
+
+            # 発火済みタスクがあれば優先的に処理
+            user_input: str | None
+            if pending_scheduled:
+                task_id, scheduled_prompt = pending_scheduled.pop(0)
+                show_schedule_fired(task_id, scheduled_prompt)
+                user_input = scheduled_prompt
+            else:
+                if idle_tracker is not None:
+                    idle_tracker.set_idle(True)
+                user_input = prompt.get_input("You > ")
+                if idle_tracker is not None:
+                    idle_tracker.set_idle(False)
 
             if user_input is None:
                 show_info("\nGoodbye!")
@@ -149,7 +192,12 @@ def chat(
 
                     # 進捗表示コールバック関数
                     def show_progress(tool_name: str, args: dict, status: str, **kwargs) -> None:
-                        if status == "executing":
+                        if status == "thinking":
+                            show_ultraplan_progress(
+                                args.get("turn", 0),
+                                args.get("elapsed", 0),
+                            )
+                        elif status == "executing":
                             show_tool_execution(tool_name, args)
                         elif status == "completed":
                             show_tool_result(
@@ -198,6 +246,27 @@ def chat(
         error_msg = handle_exception(e, verbose=settings.verbose)
         show_error(error_msg)
         raise typer.Exit(code=1) from e
+    finally:
+        if scheduler is not None:
+            scheduler.stop()
+
+
+def _drain_scheduler(
+    scheduler: SchedulerDaemon,
+    pending: list[tuple[str, str]],
+) -> None:
+    """スケジューラの fire_queue を pending リストへ移し替える。
+
+    Args:
+        scheduler: スケジューラデーモン
+        pending: 保留中の (task_id, prompt) ペアリスト (mutated)
+    """
+    while True:
+        try:
+            event = scheduler.fire_queue.get_nowait()
+        except Exception:
+            break
+        pending.append((event.task_id, event.prompt))
 
 
 @app.command()
