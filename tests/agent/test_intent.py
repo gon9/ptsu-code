@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from ptsu_code.agent.intent import Intent, IntentClassifier, IntentResult
+from ptsu_code.agent.intent import Intent, IntentClassifier, IntentResult, has_ultraplan_keyword
 from ptsu_code.agent.providers.base import LLMResponse
 from ptsu_code.agent.sub_agents.base import AgentRole
 
@@ -26,11 +26,12 @@ class TestIntent:
         assert Intent.EXECUTE.value == "execute"
         assert Intent.QUESTION.value == "question"
         assert Intent.MULTI.value == "multi"
+        assert Intent.ULTRAPLAN.value == "ultraplan"
 
     def test_all_intents_exist(self):
         """全Intentが定義されていることを確認する。"""
         values = {i.value for i in Intent}
-        assert values == {"search", "code", "execute", "question", "multi"}
+        assert values == {"search", "code", "execute", "question", "multi", "ultraplan"}
 
 
 class TestIntentResult:
@@ -56,6 +57,51 @@ class TestIntentResult:
         assert result.confidence == 0.85
         assert result.sub_intents == [Intent.CODE]
         assert result.suggested_agent == AgentRole.SEARCHER
+
+
+class TestHasUltraplanKeyword:
+    """has_ultraplan_keyword関数のテスト。"""
+
+    @pytest.mark.parametrize("text", [
+        "ultraplan this codebase",
+        "please ULTRAPLAN my project",
+        "UltraPlan the architecture",
+        "can you ultraplan?",
+    ])
+    def test_detects_keyword(self, text: str):
+        """ultraplanキーワードを検出することを確認する。"""
+        assert has_ultraplan_keyword(text) is True
+
+    @pytest.mark.parametrize("text", [
+        "plan this feature",
+        "create a detailed plan",
+        "",
+    ])
+    def test_no_false_positives(self, text: str):
+        """ultraplanが含まれないテキストでFalseを返すことを確認する。"""
+        assert has_ultraplan_keyword(text) is False
+
+
+class TestIntentClassifierUltraplan:
+    """IntentClassifierのULTRAPLAN分類テスト。"""
+
+    def test_classify_ultraplan_keyword_bypasses_llm(self):
+        """ultraplanキーワードがあればLLMを呼ばずにULTRAPLANを返すことを確認する。"""
+        provider = MagicMock()
+        classifier = IntentClassifier(provider)
+        result = classifier.classify("ultraplan this project")
+        assert result.primary == Intent.ULTRAPLAN
+        assert result.suggested_agent == AgentRole.ULTRAPLAN
+        assert result.confidence == 1.0
+        provider.chat.assert_not_called()
+
+    def test_classify_case_insensitive_ultraplan(self):
+        """大文字小文字を問わずULTRAPLANを検出することを確認する。"""
+        provider = MagicMock()
+        classifier = IntentClassifier(provider)
+        result = classifier.classify("ULTRAPLAN the refactoring")
+        assert result.primary == Intent.ULTRAPLAN
+        provider.chat.assert_not_called()
 
 
 class TestIntentClassifier:

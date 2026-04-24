@@ -17,6 +17,7 @@ class AgentRole(Enum):
     CODER = "coder"
     EXECUTOR = "executor"
     GENERAL = "general"
+    ULTRAPLAN = "ultraplan"
 
 
 @dataclass

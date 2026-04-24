@@ -78,6 +78,9 @@ class Coordinator:
         if intent.primary == Intent.MULTI:
             return self._handle_multi(user_message, intent, context, on_dispatch, request_approval_callback, show_progress_callback)
 
+        if intent.primary == Intent.ULTRAPLAN:
+            return self._handle_ultraplan(user_message, intent, context, on_dispatch, request_approval_callback, show_progress_callback)
+
         agent = self._select_agent(intent.suggested_agent)
         if on_dispatch:
             on_dispatch(agent.config.role, agent.config.name)
@@ -157,3 +160,33 @@ class Coordinator:
             results.append(f"[{agent.config.name}]\n{result}")
 
         return "\n\n".join(results)
+
+    def _handle_ultraplan(
+        self,
+        message: str,
+        intent: IntentResult,
+        context: dict[str, Any] | None,
+        on_dispatch: Any,
+        request_approval_callback: Callable | None = None,
+        show_progress_callback: Callable | None = None,
+    ) -> str:
+        """ULTRAPLANリクエストを処理する。
+
+        UltraPlanAgentを使って深い調査と計画立案を行う。
+        エージェントが存在しない場合はGENERALにフォールバックする。
+
+        Args:
+            message: ユーザーメッセージ
+            intent: 意図分類結果
+            context: コンテキスト情報
+            on_dispatch: ディスパッチ時のコールバック
+            request_approval_callback: ツール承認コールバック
+            show_progress_callback: 進捗表示コールバック
+
+        Returns:
+            承認されたプラン内容
+        """
+        agent = self._select_agent(AgentRole.ULTRAPLAN)
+        if on_dispatch:
+            on_dispatch(agent.config.role, agent.config.name)
+        return agent.run(self.runtime, message, context, request_approval_callback, show_progress_callback)

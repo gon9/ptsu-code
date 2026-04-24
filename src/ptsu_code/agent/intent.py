@@ -43,13 +43,19 @@ Examples:
 - "Find the login code and fix the timeout issue"
 - "Run tests and show me which ones failed"
 
+**ULTRAPLAN**: The user wants deep investigation and a detailed plan before implementation
+Examples:
+- "ultraplan this codebase"
+- "Spend time analyzing the architecture and create a comprehensive refactoring plan"
+- "I need a detailed plan before we touch any code"
+
 Respond ONLY in JSON format with no extra text:
 {{
-    "primary": "SEARCH|CODE|EXECUTE|QUESTION|MULTI",
+    "primary": "SEARCH|CODE|EXECUTE|QUESTION|MULTI|ULTRAPLAN",
     "confidence": 0.0,
     "sub_intents": [],
     "reasoning": "Brief explanation",
-    "suggested_agent": "searcher|coder|executor|general"
+    "suggested_agent": "searcher|coder|executor|general|ultraplan"
 }}
 
 User message: {user_message}
@@ -60,6 +66,7 @@ _INTENT_TO_ROLE: dict[str, AgentRole] = {
     "coder": AgentRole.CODER,
     "executor": AgentRole.EXECUTOR,
     "general": AgentRole.GENERAL,
+    "ultraplan": AgentRole.ULTRAPLAN,
 }
 
 _PRIMARY_TO_ROLE: dict[str, AgentRole] = {
@@ -68,7 +75,23 @@ _PRIMARY_TO_ROLE: dict[str, AgentRole] = {
     "EXECUTE": AgentRole.EXECUTOR,
     "QUESTION": AgentRole.GENERAL,
     "MULTI": AgentRole.GENERAL,
+    "ULTRAPLAN": AgentRole.ULTRAPLAN,
 }
+
+_ULTRAPLAN_KEYWORD_RE = r"\bultraplan\b"
+
+
+def has_ultraplan_keyword(text: str) -> bool:
+    """テキストに 'ultraplan' キーワードが含まれているかを返す。
+
+    Args:
+        text: 検査するテキスト
+
+    Returns:
+        'ultraplan' キーワードが含まれている場合 True
+    """
+    import re
+    return bool(re.search(_ULTRAPLAN_KEYWORD_RE, text, re.IGNORECASE))
 
 
 class Intent(Enum):
@@ -79,6 +102,7 @@ class Intent(Enum):
     EXECUTE = "execute"
     QUESTION = "question"
     MULTI = "multi"
+    ULTRAPLAN = "ultraplan"
 
 
 @dataclass
@@ -110,6 +134,7 @@ class IntentClassifier:
     ) -> IntentResult:
         """ユーザーメッセージの意図を分類する。
 
+        'ultraplan' キーワードを含む場合は即座に ULTRAPLAN に分類する。
         LLMにJSON形式で分類させ、構造化されたレスポンスを返す。
         分類失敗時はGENERALにフォールバックする。
 
@@ -126,6 +151,14 @@ class IntentClassifier:
                 confidence=1.0,
                 reasoning="Empty message defaults to QUESTION",
                 suggested_agent=AgentRole.GENERAL,
+            )
+
+        if has_ultraplan_keyword(user_message):
+            return IntentResult(
+                primary=Intent.ULTRAPLAN,
+                confidence=1.0,
+                reasoning="'ultraplan' keyword detected — routing to UltraPlanAgent",
+                suggested_agent=AgentRole.ULTRAPLAN,
             )
 
         messages: list[dict[str, Any]] = []

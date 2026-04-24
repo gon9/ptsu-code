@@ -41,11 +41,12 @@ class TestAgentRole:
         assert AgentRole.CODER.value == "coder"
         assert AgentRole.EXECUTOR.value == "executor"
         assert AgentRole.GENERAL.value == "general"
+        assert AgentRole.ULTRAPLAN.value == "ultraplan"
 
     def test_role_members(self):
         """全ロールが存在することを確認する。"""
         roles = {r.value for r in AgentRole}
-        assert roles == {"searcher", "coder", "executor", "general"}
+        assert roles == {"searcher", "coder", "executor", "general", "ultraplan"}
 
     @pytest.mark.parametrize("role", list(AgentRole))
     def test_role_enum_access(self, role: AgentRole):
