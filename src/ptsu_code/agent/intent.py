@@ -37,6 +37,9 @@ Examples:
 - "What's the difference between async and sync?"
 - "How should I structure this API?"
 - "Explain how JWT authentication works"
+- Scheduling / reminder / timer requests also go here: "1分後に X して",
+  "毎日9時に Y を実行", "30分後に Z を確認", "予定一覧を教えて", "予定をキャンセル"
+  (The target agent has schedule_create / schedule_list / schedule_delete tools.)
 
 **MULTI**: The request involves multiple of the above
 Examples:

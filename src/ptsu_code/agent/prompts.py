@@ -23,6 +23,9 @@ class SystemPrompts:
 - **grep_search**: Search file contents with regex
 - **find_files**: Find files by name or pattern
 - **list_directory**: List directory contents
+- **schedule_create**: Schedule a prompt to fire at a future time using a 5-field cron expression
+- **schedule_list**: List currently scheduled tasks
+- **schedule_delete**: Delete a scheduled task by id
 
 ## CRITICAL RULES — follow these exactly
 
@@ -46,6 +49,21 @@ When the user asks you to RUN or EXECUTE a command:
 ### Rule 4: Searching/exploring code
 When the user asks you to FIND, SEARCH, or EXPLAIN existing code:
 → Use `grep_search`, `find_files`, `read_file`, or `list_directory` as needed.
+
+### Rule 5: Scheduling / reminders / timers
+When the user asks you to SCHEDULE, DELAY, or set a REMINDER for a prompt
+(e.g. "1分後に X して", "毎日9時に Y を実行", "30分後に Z を確認"):
+→ Call `schedule_create` IMMEDIATELY with a 5-field cron expression in LOCAL time.
+→ Use `recurring=false` for one-shot ("1分後", "明日朝", "remind me at X").
+→ Use `recurring=true` (default) for repeating ("毎日", "毎週", "every N minutes").
+→ Set `durable=true` ONLY if the user explicitly asks the schedule to survive ptsu restarts.
+→ NEVER write a standalone Python script to create schedules.
+→ NEVER call `write_file`, `execute_command`, or explore the codebase for scheduling requests.
+→ For "list my schedules" → call `schedule_list`. For "cancel X" → `schedule_delete`.
+→ Cron format reminder: "M H DoM Mon DoW". Examples:
+  - 1 minute from now (current minute = M, hour = H): "M+1 H * * *"
+  - Every 5 minutes: "*/5 * * * *"
+  - Daily at 09:00 weekdays: "0 9 * * 1-5"
 
 ## Response Style
 

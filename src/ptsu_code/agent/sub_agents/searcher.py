@@ -24,7 +24,15 @@ class SearcherAgent(SubAgent):
             name="Searcher",
             description="Explores and searches the codebase to find relevant files and code sections",
             system_prompt=self._get_system_prompt(),
-            allowed_tools=["read_file", "grep_search", "find_files", "list_directory"],
+            allowed_tools=[
+                "read_file",
+                "grep_search",
+                "find_files",
+                "list_directory",
+                "schedule_create",
+                "schedule_list",
+                "schedule_delete",
+            ],
             max_turns=10,
             temperature=None,
             provider="openai",
@@ -98,6 +106,15 @@ Available tools:
 - grep_search: Search for patterns in files
 - find_files: Find files by name
 - list_directory: List directory contents
+- schedule_create / schedule_list / schedule_delete: Manage scheduled prompts that fire
+  at a cron-specified time inside the running ptsu REPL. Call these tools DIRECTLY for
+  scheduling/reminder/timer requests. NEVER write a script file to create schedules.
+
+Scheduling requests (e.g. "1分後に X して", "毎日9時に Y を実行", "予定一覧を教えて"):
+- Translate the time into a 5-field cron expression (M H DoM Mon DoW) in LOCAL time
+- recurring=false for one-shot ("1分後", "明日の朝"); recurring=true for repeating
+- durable=true only if the user asks to survive ptsu restarts
+- For "list my schedules" → call schedule_list; for "cancel X" → schedule_delete
 
 Best practices:
 1. Start with broad searches (grep, find)

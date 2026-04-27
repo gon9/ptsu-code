@@ -25,7 +25,16 @@ class CoderAgent(SubAgent):
             name="Coder",
             description="Reads and writes code files to implement features or fix bugs",
             system_prompt=self._get_system_prompt(),
-            allowed_tools=["read_file", "write_file", "grep_search", "find_files", "list_directory"],
+            allowed_tools=[
+                "read_file",
+                "write_file",
+                "grep_search",
+                "find_files",
+                "list_directory",
+                "schedule_create",
+                "schedule_list",
+                "schedule_delete",
+            ],
             max_turns=10,
             temperature=None,
             provider="anthropic",
@@ -94,8 +103,19 @@ Available tools:
 - grep_search: Search for patterns in files
 - find_files: Find files by name
 - list_directory: List directory contents
+- schedule_create / schedule_list / schedule_delete: Manage scheduled prompts that fire
+  at a cron-specified time inside the running ptsu REPL. Use these tools DIRECTLY when
+  the user asks you to schedule, delay, or set a reminder for a task. NEVER write a
+  standalone Python script to create schedules — always call schedule_create instead.
 
 IMPORTANT: Call write_file directly without asking for permission. The system handles approval automatically — you do NOT need to ask the user.
+
+Scheduling requests (e.g. "1分後に X して", "毎日9時に Y を実行", "30分後に Z を確認"):
+- Translate the time into a 5-field cron expression (M H DoM Mon DoW) in LOCAL time
+- Use recurring=false for one-shot requests ("remind me at X", "1分後", "明日の朝")
+- Use recurring=true (default) for repeating requests ("毎日", "毎週", "every N minutes")
+- durable defaults to false; set durable=true ONLY if the user asks it to survive ptsu restarts
+- Call schedule_create ONCE and return the result — do NOT also write a script file
 
 Best practices:
 1. Always read the target file before modifying it
