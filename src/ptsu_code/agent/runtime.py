@@ -10,6 +10,7 @@ from ptsu_code.exceptions import PTSUError
 from .approval import ApprovalManager
 from .providers.anthropic_provider import AnthropicProvider
 from .providers.base import LLMProvider, LLMStreamChunk
+from .providers.ollama_provider import OllamaProvider
 from .providers.openai_provider import OpenAIProvider
 from .tools.registry import ToolRegistry
 
@@ -110,6 +111,11 @@ class AgentRuntime:
             self.provider = AnthropicProvider(
                 api_key=api_key,
                 default_model=model or get_model("anthropic", "smart"),
+            )
+        elif self.provider_name == "ollama":
+            self.provider = OllamaProvider(
+                base_url=settings.ollama_base_url,
+                default_model=model or get_model("ollama", "smart"),
             )
         else:
             api_key = api_key or settings.openai_api_key

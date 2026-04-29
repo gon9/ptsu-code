@@ -13,6 +13,10 @@ PROVIDER_MODELS: dict[str, dict[str, str]] = {
         "fast": "claude-haiku-4-5",
         "smart": "claude-sonnet-4-5",
     },
+    "ollama": {
+        "fast": "llama3.2",
+        "smart": "llama3.1",
+    },
 }
 
 
@@ -37,6 +41,9 @@ class Settings(BaseSettings):
     anthropic_model_fast: str = "claude-haiku-4-5"
     anthropic_model_smart: str = "claude-sonnet-4-5"
     history_dir: Path = Path.home() / ".ptsu" / "history"
+    ollama_base_url: str = "http://localhost:11434/v1"
+    ollama_model_fast: str = "llama3.2"
+    ollama_model_smart: str = "llama3.1"
 
 
 settings = Settings()
@@ -60,6 +67,10 @@ def get_model(provider: str, tier: str = "fast") -> str:
         "anthropic": {
             "fast": settings.anthropic_model_fast,
             "smart": settings.anthropic_model_smart,
+        },
+        "ollama": {
+            "fast": settings.ollama_model_fast,
+            "smart": settings.ollama_model_smart,
         },
     }
     return tier_map.get(provider, tier_map["openai"]).get(tier, settings.openai_model_fast)

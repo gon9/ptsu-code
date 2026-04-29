@@ -11,14 +11,21 @@ from .base import LLMProvider, LLMResponse, LLMStreamChunk
 class OpenAIProvider(LLMProvider):
     """OpenAI APIプロバイダー。"""
 
-    def __init__(self, api_key: str, default_model: str = "gpt-5-mini") -> None:
+    def __init__(
+        self,
+        api_key: str,
+        default_model: str = "gpt-5-mini",
+        base_url: str | None = None,
+    ) -> None:
         """初期化。
 
         Args:
             api_key: OpenAI APIキー
             default_model: デフォルトモデル
+            base_url: API エンドポイント。None の場合は OpenAI 公式を使用。
+                      Ollama 等の互換 API を使う場合は例: "http://localhost:11434/v1"
         """
-        self.client = OpenAI(api_key=api_key)
+        self.client = OpenAI(api_key=api_key, base_url=base_url)
         self.default_model = default_model
 
     def chat(

@@ -10,6 +10,7 @@ from ptsu_code import __version__
 from ptsu_code.agent.coordinator import Coordinator
 from ptsu_code.agent.intent import IntentClassifier
 from ptsu_code.agent.prompts import SystemPrompts
+from ptsu_code.agent.providers.ollama_provider import OllamaProvider
 from ptsu_code.agent.runtime import AgentRuntime, AgentSession
 from ptsu_code.agent.sub_agents.base import AgentRole
 from ptsu_code.agent.sub_agents.coder import CoderAgent
@@ -78,9 +79,10 @@ def _build_coordinator(runtime: AgentRuntime) -> Coordinator:
 def chat(
     verbose: Annotated[bool, typer.Option("--verbose", "-v", help="Enable verbose output")] = False,
     llm: Annotated[bool, typer.Option("--llm/--no-llm", help="Enable LLM mode")] = True,
-    provider: Annotated[str, typer.Option(help="LLM provider (openai or anthropic)")] = "openai",
+    provider: Annotated[str, typer.Option(help="LLM provider (openai, anthropic, or ollama)")] = "openai",
     stream: Annotated[bool, typer.Option("--stream/--no-stream", help="Enable streaming responses")] = True,
     coordinator: Annotated[bool, typer.Option("--coordinator/--no-coordinator", help="Enable Coordinator Mode")] = False,
+    local_memory: Annotated[bool, typer.Option("--local-memory/--no-local-memory", help="Use local Ollama for memory extraction")] = False,
 ) -> None:
     """対話モードを起動する。"""
     try:
@@ -102,13 +104,13 @@ def chat(
         if use_llm:
             provider_name = provider or settings.llm_provider
 
-            # APIキーチェック
+            # APIキーチェック (ollama はキー不要)
             if provider_name == "anthropic":
                 if not settings.anthropic_api_key:
                     show_error("Anthropic API key is not configured. Set PTSU_ANTHROPIC_API_KEY environment variable.")
                     show_info("Falling back to echo mode. Use --no-llm to suppress this message.")
                     use_llm = False
-            else:
+            elif provider_name != "ollama":
                 if not settings.openai_api_key:
                     show_error("OpenAI API key is not configured. Set PTSU_OPENAI_API_KEY environment variable.")
                     show_info("Falling back to echo mode. Use --no-llm to suppress this message.")
@@ -131,8 +133,18 @@ def chat(
                 session.tool_registry.register(ScheduleDeleteTool(schedule_store))
 
                 session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+                memory_provider = (
+                    OllamaProvider(
+                        base_url=settings.ollama_base_url,
+                        default_model=settings.ollama_model_fast,
+                    )
+                    if local_memory
+                    else runtime.provider
+                )
+                if local_memory:
+                    show_info(f"Memory extraction: Ollama ({settings.ollama_model_fast} @ {settings.ollama_base_url})")
                 memory_manager = SessionMemoryManager(
-                    provider=runtime.provider,
+                    provider=memory_provider,
                     session_id=session_id,
                     data_dir=Path.home() / ".ptsu",
                 )
