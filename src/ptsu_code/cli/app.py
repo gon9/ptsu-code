@@ -1,5 +1,7 @@
 """CLIアプリケーションのメインエントリーポイント。"""
 
+from datetime import datetime
+from pathlib import Path
 from typing import Annotated
 
 import typer
@@ -16,6 +18,7 @@ from ptsu_code.agent.sub_agents.searcher import SearcherAgent
 from ptsu_code.agent.sub_agents.ultraplan import UltraPlanAgent
 from ptsu_code.agent.tools.command_tool import CommandExecutionTool
 from ptsu_code.agent.tools.file_tools import FileReadTool, FileWriteTool
+from ptsu_code.agent.tools.memory_tools import MemorySummaryTool
 from ptsu_code.agent.tools.plan_tools import ExitPlanModeTool, WritePlanTool
 from ptsu_code.agent.tools.schedule_tools import (
     ScheduleCreateTool,
@@ -41,6 +44,7 @@ from ptsu_code.cli.ui import (
 )
 from ptsu_code.config import settings
 from ptsu_code.exceptions import handle_exception
+from ptsu_code.memory import SessionMemoryManager
 from ptsu_code.scheduler import IdleTracker, SchedulerDaemon, ScheduleStore
 
 app = typer.Typer(
@@ -92,6 +96,7 @@ def chat(
         session = None
         scheduler: SchedulerDaemon | None = None
         idle_tracker: IdleTracker | None = None
+        memory_manager: SessionMemoryManager | None = None
         use_llm = llm
 
         if use_llm:
@@ -124,9 +129,21 @@ def chat(
                 session.tool_registry.register(ScheduleCreateTool(schedule_store))
                 session.tool_registry.register(ScheduleListTool(schedule_store))
                 session.tool_registry.register(ScheduleDeleteTool(schedule_store))
+
+                session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+                memory_manager = SessionMemoryManager(
+                    provider=runtime.provider,
+                    session_id=session_id,
+                    data_dir=Path.home() / ".ptsu",
+                )
+                session.tool_registry.register(MemorySummaryTool(memory_manager))
                 runtime.session_tool_registry = session.tool_registry
 
                 system_prompt = SystemPrompts.coding_assistant()
+                prev_memory = memory_manager.load_previous()
+                if prev_memory:
+                    system_prompt += f"\n\n## Previous Session Memory\n{prev_memory}"
+                    show_info("Previous session memory loaded.")
                 session.add_message("system", system_prompt)
                 show_info(f"LLM mode enabled ({provider_name}) with {len(session.tool_registry)} tools available.")
 
@@ -170,10 +187,22 @@ def chat(
                 show_info("Goodbye!")
                 break
 
+            if user_input.lower() == "/summary":
+                if memory_manager:
+                    ok = memory_manager.force_extract()
+                    if ok:
+                        show_info(f"Session memory saved: {memory_manager.storage.current_path}")
+                    else:
+                        show_info("No conversation to summarize yet.")
+                else:
+                    show_info("Session memory is not available in echo mode.")
+                continue
+
             if user_input.lower() == "help":
                 help_text = (
                     "Available commands:\n"
                     "  - exit, quit: Exit the chat\n"
+                    "  - /summary: Save session memory now\n"
                     "  - help: Show this help message\n"
                 )
                 if use_llm and session:
@@ -216,6 +245,7 @@ def chat(
                         elif event == "end":
                             show_streaming_end()
 
+                    msg_count_before = len(session.messages) if session else 0
                     if coordinator:
                         coord = _build_coordinator(runtime)
                         response = coord.process(
@@ -225,13 +255,24 @@ def chat(
                             show_progress_callback=show_progress,
                         )
                         show_message("assistant", response)
+                        if memory_manager:
+                            memory_manager.add_turn(user_input, response)
+                            memory_manager.maybe_extract()
                     elif stream:
                         response = runtime.run_loop_stream(
                             session, user_input, request_approval, show_progress, handle_stream
                         )
+                        if memory_manager and session:
+                            tool_count = _count_new_tool_calls(session, msg_count_before)
+                            memory_manager.add_turn(user_input, response, tool_count)
+                            memory_manager.maybe_extract()
                     else:
                         response = runtime.run_loop(session, user_input, request_approval, show_progress)
                         show_message("assistant", response)
+                        if memory_manager and session:
+                            tool_count = _count_new_tool_calls(session, msg_count_before)
+                            memory_manager.add_turn(user_input, response, tool_count)
+                            memory_manager.maybe_extract()
                 except Exception as e:
                     error_msg = handle_exception(e, verbose=settings.verbose)
                     show_error(f"LLM error: {error_msg}")
@@ -247,8 +288,31 @@ def chat(
         show_error(error_msg)
         raise typer.Exit(code=1) from e
     finally:
+        if memory_manager is not None:
+            try:
+                memory_manager.finalize()
+            except Exception:
+                pass
         if scheduler is not None:
             scheduler.stop()
+
+
+def _count_new_tool_calls(session: AgentSession, msg_count_before: int) -> int:
+    """指定のメッセージインデックス以降のツール呼び出し数を返す。
+
+    Args:
+        session: エージェントセッション
+        msg_count_before: ターン開始前のメッセージ数
+
+    Returns:
+        ツール呼び出し数
+    """
+    new_msgs = session.messages[msg_count_before:]
+    return sum(
+        len(msg.tool_calls)
+        for msg in new_msgs
+        if msg.role == "assistant" and msg.tool_calls
+    )
 
 
 def _drain_scheduler(
