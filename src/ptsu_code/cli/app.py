@@ -11,6 +11,7 @@ from ptsu_code.agent.coordinator import Coordinator
 from ptsu_code.agent.intent import IntentClassifier
 from ptsu_code.agent.prompts import SystemPrompts
 from ptsu_code.agent.providers.ollama_provider import OllamaProvider
+from ptsu_code.agent.providers.probe import AvailableProviders, probe_providers
 from ptsu_code.agent.runtime import AgentRuntime, AgentSession
 from ptsu_code.agent.sub_agents.base import AgentRole
 from ptsu_code.agent.sub_agents.coder import CoderAgent
@@ -33,6 +34,7 @@ from ptsu_code.cli.ui import (
     show_error,
     show_info,
     show_message,
+    show_provider_availability,
     show_schedule_fired,
     show_streaming_chunk,
     show_streaming_end,
@@ -101,20 +103,19 @@ def chat(
         memory_manager: SessionMemoryManager | None = None
         use_llm = llm
 
+        # 起動時プロバイダー可用性チェック
+        availability: AvailableProviders | None = None
+        if use_llm:
+            availability = probe_providers()
+            show_provider_availability(availability)
+
         if use_llm:
             provider_name = provider or settings.llm_provider
 
-            # APIキーチェック (ollama はキー不要)
-            if provider_name == "anthropic":
-                if not settings.anthropic_api_key:
-                    show_error("Anthropic API key is not configured. Set PTSU_ANTHROPIC_API_KEY environment variable.")
-                    show_info("Falling back to echo mode. Use --no-llm to suppress this message.")
-                    use_llm = False
-            elif provider_name != "ollama":
-                if not settings.openai_api_key:
-                    show_error("OpenAI API key is not configured. Set PTSU_OPENAI_API_KEY environment variable.")
-                    show_info("Falling back to echo mode. Use --no-llm to suppress this message.")
-                    use_llm = False
+            if not availability.is_available(provider_name):
+                show_error(f"Provider '{provider_name}' is not available in this session.")
+                show_info("Falling back to echo mode. Use --no-llm to suppress this message.")
+                use_llm = False
 
             if use_llm:
                 runtime = AgentRuntime(provider=provider_name)
@@ -133,6 +134,10 @@ def chat(
                 session.tool_registry.register(ScheduleDeleteTool(schedule_store))
 
                 session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+                if local_memory and availability and not availability.is_available("ollama"):
+                    show_info("Ollama not available — memory extraction falls back to main provider.")
+                    local_memory = False
+
                 memory_provider = (
                     OllamaProvider(
                         base_url=settings.ollama_base_url,

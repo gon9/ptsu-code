@@ -4,6 +4,7 @@ from rich.console import Console, Group
 from rich.panel import Panel
 from rich.text import Text
 
+from ptsu_code.agent.providers.probe import AvailableProviders
 from ptsu_code.agent.sub_agents.base import AgentRole
 
 console = Console()
@@ -102,6 +103,22 @@ def show_info(message: str) -> None:
         message: 情報メッセージ
     """
     console.print(f"[cyan]ℹ[/cyan] {message}")
+
+
+def show_provider_availability(availability: AvailableProviders) -> None:
+    """利用可能な AI プロバイダーの一覧を表示する。
+
+    Args:
+        availability: プローブ結果
+    """
+    console.print("[cyan]ℹ[/cyan] Available AI providers:")
+    for r in availability.results:
+        if r.available:
+            model_part = f"  [dim]{r.model}[/dim]" if r.model else ""
+            console.print(f"  [green]✓[/green] [bold]{r.name:<12}[/bold]{model_part}")
+        else:
+            reason_part = f"  [dim]({r.reason})[/dim]" if r.reason else ""
+            console.print(f"  [red]✗[/red] [bold]{r.name:<12}[/bold]{reason_part}")
 
 
 def show_tool_execution(tool_name: str, args: dict) -> None:
