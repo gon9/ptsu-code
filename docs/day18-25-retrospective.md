@@ -1,5 +1,5 @@
 ---
-date: 2026-04-30
+date: 2026-05-02
 phase: Day 18-25 完了後の振り返り
 completed_steps:
   - Dream System 設計ドキュメント (day18-21-memory-design.md)
@@ -10,6 +10,7 @@ completed_steps:
   - Phase 5: cli/app.py 統合 (注入・ターン追加・終了時アーカイブ)
   - Phase 6: /summary ツール (MemorySummaryTool)
   - OllamaProvider + ハイブリッドメモリ抽出 (--local-memory)
+  - ProviderProber — 起動時可用性チェック + graceful fallback
 ---
 
 # Day 18-25 振り返り（Dream System + Local AI Integration）
@@ -40,6 +41,14 @@ completed_steps:
 - `AgentRuntime`: `--provider ollama` ルート追加 (API キーチェックをスキップ)
 - `--local-memory` フラグ: 会話は cloud LLM、メモリ抽出だけ Ollama にオフロードするハイブリッド構成
 
+### Step 5: ProviderProber (Day 25)
+- `probe.py`: `ProviderAvailability` / `AvailableProviders` / `probe_providers()` — 全プロバイダー可用性を一括チェック
+  * openai / anthropic: API キー有無
+  * ollama: HTTP GET `localhost:11434/` (2秒 timeout)
+- `cli/ui.py`: `show_provider_availability()` — ✓/✗ カラー表示
+- `cli/app.py`: 起動時プローブ → 指定プロバイダー不可なら echo fallback
+- `--local-memory` + Ollama 未起動 → 自動的に main provider にフォールバック + 警告表示
+
 ---
 
 ## ✅ 良かった点
@@ -64,18 +73,10 @@ completed_steps:
 
 ## ❌ 悪かった点・改善点
 
-### 1. **Ollama の起動が前提条件のまま**
+### 1. **Ollama の起動が前提条件のまま → ✅ 解決済み**
 - **問題**: `--provider ollama` / `--local-memory` 時に Ollama が未起動だと `httpx.ConnectError` が発生し、ptsu のエラーメッセージとして出てこない
-- **改善案**: `OllamaProvider.is_available()` を追加し、`app.py` で事前確認 → 失敗時に cloud fallback または明確なエラーメッセージを出す
-  ```python
-  @classmethod
-  def is_available(cls, base_url: str = DEFAULT_OLLAMA_BASE_URL) -> bool:
-      try:
-          httpx.get(base_url.replace("/v1", "/"), timeout=2.0)
-          return True
-      except httpx.ConnectError:
-          return False
-  ```
+- **対応**: `ProviderProber` を実装。起動時に HTTP ping で Ollama 可用性をチェックし、不可なら明確なエラー表示 / graceful fallback を実施
+- **残課題**: Ollama がセッション途中で落ちた場合のリトライハンドリングは未実装
 
 ### 2. **manager.py L154 が未カバー**
 - `force_extract` で「変化なし & 空でない」パスがテスト困難
@@ -89,17 +90,22 @@ completed_steps:
 - `app.py` のストリーミングパスで `add_turn / maybe_extract` が動く保証がテストレベルにない
 - CLI 統合テストを追加する必要がある
 
+### 5. **Ollama セッション中の断絶に未対応**
+- 起動時チェックは完了したが、セッション途中で Ollama が落ちるケースのリトライは未実装
+- `maybe_extract()` が失敗した場合のロギングと自動フォールバックが必要
+
 ---
 
 ## 📊 メトリクス
 
 | 指標 | 値 |
 |------|-----|
-| テスト数 | 531件 (+72件) |
+| テスト数 | 547件 (+88件) |
 | カバレッジ | 88% (→ 88% 維持) |
-| 新規ファイル数 | 14 |
-| コミット数 | 4 |
+| 新規ファイル数 | 16 |
+| コミット数 | 6 |
 | memory パッケージカバレッジ | 98-100% |
+| probe.py カバレッジ | 16 テスト |
 
 ---
 
@@ -109,12 +115,14 @@ completed_steps:
 2. **ハイブリッド設計はプロバイダー注入パターンで簡潔に表現できる** — 単一責任の `SessionMemoryManager(provider=...)` に差し込むだけ
 3. **アトミック書き込み (`tmp → rename`) はセッション中断時のファイル破損を防ぐ鍵** — 実装コストが低い割に信頼性への貢献が大きい
 4. **テストの `strip()` と実装の `.strip()` の一致確認は見落としやすい** — 文字列の末尾処理は常に明示的に
+5. **プロバイダー探索は起動時に一度だけ実行するのが正解** — セッション中は結果をキャッシュして参照するだけで十分
+6. **ユーザーの「運営方法」という視点が重要** — コードの正しさだけでなく、ユーザーが実際に使うシーン（Ollama 未起動、キー未設定等）を先に考えてから実装する
 
 ---
 
 ## 🔜 次のステップへの示唆
 
-- **Ollama 可用性チェック + graceful fallback** (`OllamaProvider.is_available()`) を優先実装
 - **Day 26-28**: プロンプトエンジニアリング — Ollama でも Tool Calling が安定するための JSON スキーマ制約調整
 - **Day 29-30**: Evaluation UX (Streamlit ダッシュボード) — タスク成功率・コスト可視化
-- **中期**: macOS launchd で `ollama serve` をデーモン化するセットアップスクリプトの提供
+- **セッション中断絶ハンドリング**: `maybe_extract()` 失敗時のリトライ + ロギング
+- **運用**: macOS launchd で `ollama serve` をデーモン化 (`brew services start ollama`) 推奨
