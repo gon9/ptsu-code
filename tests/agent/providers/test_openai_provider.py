@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from ptsu_code.agent.providers.base import LLMResponse
+from ptsu_code.agent.providers.base import LLMResponse, LLMUsage
 from ptsu_code.agent.providers.openai_provider import OpenAIProvider
 
 
@@ -23,7 +23,13 @@ def provider(mock_openai_client):
     return OpenAIProvider(api_key="test-key")
 
 
-def _make_chat_response(content: str, tool_calls=None, finish_reason: str = "stop"):
+def _make_chat_response(
+    content: str,
+    tool_calls=None,
+    finish_reason: str = "stop",
+    prompt_tokens: int | None = None,
+    completion_tokens: int | None = None,
+):
     """OpenAI chat completion レスポンスのモックを生成する。"""
     message = MagicMock()
     message.content = content
@@ -35,6 +41,15 @@ def _make_chat_response(content: str, tool_calls=None, finish_reason: str = "sto
 
     response = MagicMock()
     response.choices = [choice]
+
+    if prompt_tokens is not None and completion_tokens is not None:
+        usage = MagicMock()
+        usage.prompt_tokens = prompt_tokens
+        usage.completion_tokens = completion_tokens
+        response.usage = usage
+    else:
+        response.usage = None
+
     return response
 
 
@@ -126,6 +141,22 @@ class TestOpenAIProviderChat:
         mock_openai_client.chat.completions.create.return_value = _make_chat_response(None)
         result = provider.chat([{"role": "user", "content": "msg"}])
         assert result.content == ""
+
+    def test_chat_captures_usage_when_present(self, provider, mock_openai_client):
+        """response.usage が存在するとき LLMUsage が設定されること。"""
+        mock_openai_client.chat.completions.create.return_value = _make_chat_response(
+            "hello", prompt_tokens=100, completion_tokens=50
+        )
+        result = provider.chat([{"role": "user", "content": "hi"}])
+        assert isinstance(result.usage, LLMUsage)
+        assert result.usage.input_tokens == 100
+        assert result.usage.output_tokens == 50
+
+    def test_chat_usage_is_none_when_absent(self, provider, mock_openai_client):
+        """response.usage が None のとき usage が None であること。"""
+        mock_openai_client.chat.completions.create.return_value = _make_chat_response("hello")
+        result = provider.chat([{"role": "user", "content": "hi"}])
+        assert result.usage is None
 
 
 class TestOpenAIProviderStream:

@@ -486,3 +486,91 @@ class TestAgentRuntimeRunLoopStream:
             session = AgentSession()
             with pytest.raises(RuntimeError, match="No final response"):
                 runtime.run_loop_stream(session, "Hi")
+
+
+class TestAgentRuntimeEvalLogger:
+    """AgentRuntime の EvalLogger フックのテスト。"""
+
+    def _make_runtime_with_logger(self):
+        """EvalLogger 付き AgentRuntime とモックを返す。"""
+        from ptsu_code.eval.logger import EvalLogger
+
+        with patch("ptsu_code.agent.runtime.OpenAIProvider") as mock_cls:
+            mock_provider = MagicMock()
+            mock_provider.default_model = "gpt-5-mini"
+            mock_cls.return_value = mock_provider
+            mock_logger = MagicMock(spec=EvalLogger)
+            runtime = AgentRuntime(provider="openai", api_key="key", eval_logger=mock_logger)
+            return runtime, mock_provider, mock_logger
+
+    def test_start_eval_session_sets_session(self):
+        """start_eval_session で _eval_session が生成されること。"""
+        runtime, _, _ = self._make_runtime_with_logger()
+        assert runtime._eval_session is None
+        runtime.start_eval_session("sid-001")
+        assert runtime._eval_session is not None
+        assert runtime._eval_session.session_id == "sid-001"
+
+    def test_start_eval_session_uuid_when_no_id(self):
+        """session_id 省略時は UUID が自動生成されること。"""
+        runtime, _, _ = self._make_runtime_with_logger()
+        runtime.start_eval_session()
+        assert runtime._eval_session is not None
+        assert len(runtime._eval_session.session_id) > 0
+
+    def test_finalize_eval_session_calls_save(self):
+        """finalize_eval_session で EvalLogger.save が呼ばれること。"""
+        runtime, _, mock_logger = self._make_runtime_with_logger()
+        runtime.start_eval_session("sid-001")
+        runtime.finalize_eval_session()
+        mock_logger.save.assert_called_once()
+
+    def test_finalize_clears_session(self):
+        """finalize_eval_session 後は _eval_session が None になること。"""
+        runtime, _, _ = self._make_runtime_with_logger()
+        runtime.start_eval_session("sid-001")
+        runtime.finalize_eval_session()
+        assert runtime._eval_session is None
+
+    def test_run_turn_records_turn_when_session_active(self):
+        """start_eval_session 後の run_turn でターンが記録されること。"""
+        runtime, mock_provider, _ = self._make_runtime_with_logger()
+        mock_provider.chat.return_value = _make_llm_response("hello")
+
+        runtime.start_eval_session("sid-001")
+        session = AgentSession()
+        session.add_message("user", "hi")
+        runtime.run_turn(session)
+
+        assert runtime._eval_session is not None
+        assert runtime._eval_session.turn_count == 1
+
+    def test_run_turn_no_logger_does_not_fail(self):
+        """eval_logger なしの run_turn がエラーを起こさないこと。"""
+        with patch("ptsu_code.agent.runtime.OpenAIProvider") as mock_cls:
+            mock_provider = MagicMock()
+            mock_provider.chat.return_value = _make_llm_response("ok")
+            mock_cls.return_value = mock_provider
+            runtime = AgentRuntime(provider="openai", api_key="key")
+
+            session = AgentSession()
+            session.add_message("user", "hi")
+            result = runtime.run_turn(session)
+            assert result.content == "ok"
+
+    def test_turn_index_increments(self):
+        """複数 run_turn でターンインデックスが増加すること。"""
+        runtime, mock_provider, _ = self._make_runtime_with_logger()
+        mock_provider.chat.return_value = _make_llm_response("ok")
+
+        runtime.start_eval_session("sid-001")
+        session = AgentSession()
+        session.add_message("user", "hi")
+        runtime.run_turn(session)
+        session.add_message("assistant", "ok")
+        session.add_message("user", "hi again")
+        runtime.run_turn(session)
+
+        assert runtime._eval_session.turn_count == 2
+        assert runtime._eval_session.turns[0].turn_index == 0
+        assert runtime._eval_session.turns[1].turn_index == 1
