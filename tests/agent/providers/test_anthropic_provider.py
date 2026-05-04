@@ -94,6 +94,74 @@ class TestConvertMessages:
         _, converted = provider._convert_messages(messages)
         assert len(converted) == 3
 
+    def test_assistant_with_tool_calls_converted(self, provider):
+        """assistantのtool_callsがAnthropic形式のcontent blocksに変換されること。"""
+        import json
+
+        messages = [
+            {"role": "user", "content": "read x.py"},
+            {
+                "role": "assistant",
+                "content": "I'll read it.",
+                "tool_calls": [
+                    {
+                        "id": "toolu_1",
+                        "type": "function",
+                        "function": {"name": "read_file", "arguments": json.dumps({"path": "x.py"})},
+                    }
+                ],
+            },
+        ]
+        _, converted = provider._convert_messages(messages)
+        asst = converted[1]
+        assert asst["role"] == "assistant"
+        assert isinstance(asst["content"], list)
+        types = {b["type"] for b in asst["content"]}
+        assert "text" in types
+        assert "tool_use" in types
+
+    def test_assistant_tool_calls_without_text(self, provider):
+        """assistantのcontentが空でもtool_use blockが生成されること。"""
+        import json
+
+        messages = [
+            {"role": "user", "content": "go"},
+            {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [
+                    {
+                        "id": "toolu_2",
+                        "type": "function",
+                        "function": {"name": "run", "arguments": json.dumps({})},
+                    }
+                ],
+            },
+        ]
+        _, converted = provider._convert_messages(messages)
+        asst = converted[1]
+        blocks = asst["content"]
+        assert all(b["type"] == "tool_use" for b in blocks)
+
+    def test_tool_role_messages_consolidated(self, provider):
+        """toolロールのメッセージが1つのuserメッセージにまとめられること。"""
+        messages = [
+            {"role": "user", "content": "do it"},
+            {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [{"id": "tc1", "type": "function", "function": {"name": "t", "arguments": "{}"}}],
+            },
+            {"role": "tool", "content": "result1", "tool_call_id": "tc1", "name": "t"},
+            {"role": "tool", "content": "result2", "tool_call_id": "tc2", "name": "t2"},
+        ]
+        _, converted = provider._convert_messages(messages)
+        tool_user = converted[-1]
+        assert tool_user["role"] == "user"
+        assert isinstance(tool_user["content"], list)
+        assert len(tool_user["content"]) == 2
+        assert all(b["type"] == "tool_result" for b in tool_user["content"])
+
 
 class TestConvertTools:
     """AnthropicProvider._convert_toolsのテスト。"""
@@ -214,6 +282,32 @@ class TestAnthropicProviderChat:
         call_kwargs = mock_anthropic_client.messages.create.call_args[1]
         assert call_kwargs["model"] == "claude-3-opus"
 
+    def test_chat_thinking_budget_sets_kwargs(self, provider, mock_anthropic_client):
+        """thinking_budget 指定時に thinking kwarg と拡張 max_tokens が設定されること。"""
+        mock_anthropic_client.messages.create.return_value = _make_chat_response([_make_text_block("ok")])
+        provider.chat([{"role": "user", "content": "msg"}], thinking_budget=1000)
+        call_kwargs = mock_anthropic_client.messages.create.call_args[1]
+        assert call_kwargs["thinking"]["type"] == "enabled"
+        assert call_kwargs["thinking"]["budget_tokens"] == 1000
+        assert call_kwargs["max_tokens"] >= 16000
+
+    def test_chat_temperature_sets_kwarg(self, provider, mock_anthropic_client):
+        """temperature 指定時に temperature kwarg が設定されること。"""
+        mock_anthropic_client.messages.create.return_value = _make_chat_response([_make_text_block("ok")])
+        provider.chat([{"role": "user", "content": "msg"}], temperature=0.7)
+        call_kwargs = mock_anthropic_client.messages.create.call_args[1]
+        assert call_kwargs["temperature"] == 0.7
+
+    def test_chat_thinking_block_is_skipped(self, provider, mock_anthropic_client):
+        """thinking ブロックがコンテンツに含まれないこと。"""
+        thinking_block = MagicMock()
+        thinking_block.type = "thinking"
+        mock_anthropic_client.messages.create.return_value = _make_chat_response(
+            [thinking_block, _make_text_block("answer")]
+        )
+        result = provider.chat([{"role": "user", "content": "msg"}])
+        assert result.content == "answer"
+
 
 class TestAnthropicProviderStream:
     """AnthropicProvider.streamのテスト。"""
@@ -321,3 +415,36 @@ class TestAnthropicProviderStream:
         chunks = list(provider.stream([{"role": "user", "content": "hi"}]))
         final_chunks = [c for c in chunks if c.is_final]
         assert len(final_chunks) == 1
+
+    def test_stream_thinking_budget_sets_kwargs(self, provider, mock_anthropic_client):
+        """stream() で thinking_budget 指定時に thinking kwarg が設定されること。"""
+        msg_delta = self._make_event("message_delta")
+        msg_delta.delta = MagicMock(stop_reason="end_turn")
+        mock_anthropic_client.messages.create.return_value = iter([msg_delta])
+
+        list(provider.stream([{"role": "user", "content": "hi"}], thinking_budget=2000))
+        call_kwargs = mock_anthropic_client.messages.create.call_args[1]
+        assert call_kwargs["thinking"]["type"] == "enabled"
+        assert call_kwargs["thinking"]["budget_tokens"] == 2000
+        assert call_kwargs["max_tokens"] >= 16000
+
+    def test_stream_temperature_sets_kwarg(self, provider, mock_anthropic_client):
+        """stream() で temperature 指定時に temperature kwarg が設定されること。"""
+        msg_delta = self._make_event("message_delta")
+        msg_delta.delta = MagicMock(stop_reason="end_turn")
+        mock_anthropic_client.messages.create.return_value = iter([msg_delta])
+
+        list(provider.stream([{"role": "user", "content": "hi"}], temperature=0.5))
+        call_kwargs = mock_anthropic_client.messages.create.call_args[1]
+        assert call_kwargs["temperature"] == 0.5
+
+    def test_stream_with_tools_passes_tools_kwarg(self, provider, mock_anthropic_client):
+        """stream() でツール指定時に tools kwarg が設定されること。"""
+        msg_delta = self._make_event("message_delta")
+        msg_delta.delta = MagicMock(stop_reason="end_turn")
+        mock_anthropic_client.messages.create.return_value = iter([msg_delta])
+
+        tools = [{"type": "function", "function": {"name": "t", "description": "d", "parameters": {}}}]
+        list(provider.stream([{"role": "user", "content": "hi"}], tools=tools))
+        call_kwargs = mock_anthropic_client.messages.create.call_args[1]
+        assert "tools" in call_kwargs

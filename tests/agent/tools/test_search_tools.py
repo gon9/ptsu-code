@@ -67,6 +67,45 @@ class TestGrepTool:
         assert result.success is True
         assert "Python" in result.output
 
+    def test_grep_command_failure(self, tmp_path):
+        """grep コマンドが失敗した場合（returncode > 1）に success=False を返すこと。"""
+        from unittest.mock import MagicMock, patch
+
+        mock_result = MagicMock()
+        mock_result.returncode = 2
+        mock_result.stdout = ""
+        mock_result.stderr = "grep: invalid option"
+
+        with patch("subprocess.run", return_value=mock_result):
+            tool = GrepTool()
+            result = tool.execute(pattern="x", path=str(tmp_path))
+
+        assert result.success is False
+        assert "grep" in result.error.lower()
+
+    def test_grep_timeout(self, tmp_path):
+        """grep がタイムアウトした場合に success=False を返すこと。"""
+        import subprocess
+        from unittest.mock import patch
+
+        with patch("subprocess.run", side_effect=subprocess.TimeoutExpired(cmd="grep", timeout=30)):
+            tool = GrepTool()
+            result = tool.execute(pattern="x", path=str(tmp_path))
+
+        assert result.success is False
+        assert "timed out" in result.error.lower()
+
+    def test_grep_unexpected_exception(self, tmp_path):
+        """予期しない例外が発生した場合に success=False を返すこと。"""
+        from unittest.mock import patch
+
+        with patch("subprocess.run", side_effect=OSError("no such file")):
+            tool = GrepTool()
+            result = tool.execute(pattern="x", path=str(tmp_path))
+
+        assert result.success is False
+        assert "Failed to execute grep" in result.error
+
 
 class TestFindTool:
     """FindToolのテストクラス。"""
@@ -131,6 +170,45 @@ class TestFindTool:
 
         assert result.success is True
         assert "subdir" in result.output
+
+    def test_find_command_failure(self, tmp_path):
+        """find コマンドが失敗した場合に success=False を返すこと。"""
+        from unittest.mock import MagicMock, patch
+
+        mock_result = MagicMock()
+        mock_result.returncode = 1
+        mock_result.stdout = ""
+        mock_result.stderr = "find: permission denied"
+
+        with patch("subprocess.run", return_value=mock_result):
+            tool = FindTool()
+            result = tool.execute(path=str(tmp_path))
+
+        assert result.success is False
+        assert "find" in result.error.lower()
+
+    def test_find_timeout(self, tmp_path):
+        """find がタイムアウトした場合に success=False を返すこと。"""
+        import subprocess
+        from unittest.mock import patch
+
+        with patch("subprocess.run", side_effect=subprocess.TimeoutExpired(cmd="find", timeout=30)):
+            tool = FindTool()
+            result = tool.execute(path=str(tmp_path))
+
+        assert result.success is False
+        assert "timed out" in result.error.lower()
+
+    def test_find_unexpected_exception(self, tmp_path):
+        """予期しない例外が発生した場合に success=False を返すこと。"""
+        from unittest.mock import patch
+
+        with patch("subprocess.run", side_effect=OSError("bad")):
+            tool = FindTool()
+            result = tool.execute(path=str(tmp_path))
+
+        assert result.success is False
+        assert "Failed to execute find" in result.error
 
 
 class TestListDirTool:
@@ -210,3 +288,41 @@ class TestListDirTool:
 
         assert result.success is True
         assert "empty" in result.output.lower()
+
+    def test_list_permission_error(self, tmp_path):
+        """PermissionError が発生した場合に success=False を返すこと。"""
+        from unittest.mock import patch
+
+        with patch("pathlib.Path.iterdir", side_effect=PermissionError("denied")):
+            tool = ListDirTool()
+            result = tool.execute(path=str(tmp_path))
+
+        assert result.success is False
+        assert "Permission denied" in result.error
+
+    def test_list_unexpected_exception(self, tmp_path):
+        """予期しない例外が発生した場合に success=False を返すこと。"""
+        from unittest.mock import patch
+
+        with patch("pathlib.Path.iterdir", side_effect=OSError("disk error")):
+            tool = ListDirTool()
+            result = tool.execute(path=str(tmp_path))
+
+        assert result.success is False
+        assert "Failed to list directory" in result.error
+
+    def test_list_symlink_shown_as_other(self, tmp_path):
+        """シンボリックリンクなど is_dir/is_file でない項目が OTHER として表示されること。"""
+        from unittest.mock import MagicMock, patch
+
+        mock_entry = MagicMock()
+        mock_entry.name = "symlink_entry"
+        mock_entry.is_dir.return_value = False
+        mock_entry.is_file.return_value = False
+
+        with patch("pathlib.Path.iterdir", return_value=iter([mock_entry])):
+            tool = ListDirTool()
+            result = tool.execute(path=str(tmp_path), show_hidden=True)
+
+        assert result.success is True
+        assert "OTHER" in result.output
