@@ -46,6 +46,7 @@ from ptsu_code.cli.ui import (
     show_welcome,
 )
 from ptsu_code.config import settings
+from ptsu_code.eval.logger import EvalLogger
 from ptsu_code.exceptions import handle_exception
 from ptsu_code.memory import SessionMemoryManager
 from ptsu_code.scheduler import IdleTracker, SchedulerDaemon, ScheduleStore
@@ -118,7 +119,8 @@ def chat(
                 use_llm = False
 
             if use_llm:
-                runtime = AgentRuntime(provider=provider_name)
+                eval_logger = EvalLogger()
+                runtime = AgentRuntime(provider=provider_name, eval_logger=eval_logger)
                 session = AgentSession()
                 schedule_store = ScheduleStore()
                 session.tool_registry.register(FileReadTool())
@@ -162,6 +164,7 @@ def chat(
                     system_prompt += f"\n\n## Previous Session Memory\n{prev_memory}"
                     show_info("Previous session memory loaded.")
                 session.add_message("system", system_prompt)
+                runtime.start_eval_session(session_id)
                 show_info(f"LLM mode enabled ({provider_name}) with {len(session.tool_registry)} tools available.")
 
                 # スケジューラデーモンを起動
@@ -308,6 +311,11 @@ def chat(
         if memory_manager is not None:
             try:
                 memory_manager.finalize()
+            except Exception:
+                pass
+        if runtime is not None:
+            try:
+                runtime.finalize_eval_session()
             except Exception:
                 pass
         if scheduler is not None:

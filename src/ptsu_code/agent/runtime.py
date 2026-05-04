@@ -1,10 +1,16 @@
 """Agent実行ランタイム。"""
 
+import time
+import uuid
 from collections.abc import Iterator
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from typing import Any
 
 from ptsu_code.config import get_model, settings
+from ptsu_code.eval.cost import estimate_cost, estimate_tokens_from_text
+from ptsu_code.eval.logger import EvalLogger
+from ptsu_code.eval.models import SessionMetrics, TurnMetrics
 from ptsu_code.exceptions import PTSUError
 
 from .approval import ApprovalManager
@@ -90,6 +96,7 @@ class AgentRuntime:
         provider: str | None = None,
         api_key: str | None = None,
         model: str | None = None,
+        eval_logger: EvalLogger | None = None,
     ) -> None:
         """初期化。
 
@@ -97,7 +104,11 @@ class AgentRuntime:
             provider: LLMプロバイダー ('openai' or 'anthropic')
             api_key: APIキー。Noneの場合は設定から取得
             model: モデル名
+            eval_logger: メトリクスロガー。None の場合は計測しない
         """
+        self._eval_logger = eval_logger
+        self._eval_session: SessionMetrics | None = None
+        self._turn_index: int = 0
         self.provider_name = provider or settings.llm_provider
         self.provider: LLMProvider
 
@@ -129,6 +140,29 @@ class AgentRuntime:
                 default_model=model or get_model("openai", "fast"),
             )
 
+    def start_eval_session(self, session_id: str | None = None) -> None:
+        """eval セッションを開始する。
+
+        Args:
+            session_id: セッション ID。None の場合は UUID を生成する。
+        """
+        if self._eval_logger is None:
+            return
+        self._turn_index = 0
+        self._eval_session = SessionMetrics(
+            session_id=session_id or str(uuid.uuid4()),
+            provider=self.provider_name,
+            model=getattr(self.provider, "default_model", ""),
+        )
+
+    def finalize_eval_session(self) -> None:
+        """eval セッションを終了し保存する。"""
+        if self._eval_logger is None or self._eval_session is None:
+            return
+        self._eval_session.finalize()
+        self._eval_logger.save(self._eval_session)
+        self._eval_session = None
+
     def run_turn(self, session: AgentSession) -> Any:
         """1ターンの会話を実行する。
 
@@ -144,17 +178,58 @@ class AgentRuntime:
         try:
             tools = session.tool_registry.get_openai_schemas() if len(session.tool_registry) > 0 else None
 
+            t0 = time.monotonic()
             response = self.provider.chat(
                 messages=session.get_messages(),
                 tools=tools,
                 temperature=session.temperature,
                 model=session.model,
             )
+            latency_ms = (time.monotonic() - t0) * 1000
+
+            self._record_turn(response, latency_ms)
 
             return response
 
         except Exception as e:
             raise RuntimeError(f"Failed to run turn: {e}", {"provider": self.provider_name}) from e
+
+    def _record_turn(self, response: Any, latency_ms: float) -> None:
+        """ターンメトリクスを eval セッションに記録する。
+
+        Args:
+            response: LLMレスポンス
+            latency_ms: レイテンシ (ms)
+        """
+        if self._eval_session is None:
+            return
+
+        model = getattr(self.provider, "default_model", "")
+
+        if response.usage:
+            in_tok = response.usage.input_tokens
+            out_tok = response.usage.output_tokens
+        else:
+            in_tok = estimate_tokens_from_text(response.content)
+            out_tok = in_tok
+
+        cost = estimate_cost(model, in_tok, out_tok)
+
+        turn = TurnMetrics(
+            session_id=self._eval_session.session_id,
+            turn_index=self._turn_index,
+            timestamp=datetime.now(UTC).isoformat(),
+            provider=self.provider_name,
+            model=model,
+            input_tokens=in_tok,
+            output_tokens=out_tok,
+            cost_usd=cost,
+            latency_ms=latency_ms,
+            had_tool_calls=bool(response.tool_calls),
+            finish_reason=response.finish_reason or "",
+        )
+        self._eval_session.add_turn(turn)
+        self._turn_index += 1
 
     def run_turn_stream(self, session: AgentSession) -> Iterator[LLMStreamChunk]:
         """ターンをストリーミングで実行する。

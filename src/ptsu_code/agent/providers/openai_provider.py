@@ -5,7 +5,7 @@ from typing import Any
 
 from openai import OpenAI
 
-from .base import LLMProvider, LLMResponse, LLMStreamChunk
+from .base import LLMProvider, LLMResponse, LLMStreamChunk, LLMUsage
 
 
 class OpenAIProvider(LLMProvider):
@@ -62,10 +62,18 @@ class OpenAIProvider(LLMProvider):
         if message.tool_calls:
             tool_calls = [tc.model_dump() for tc in message.tool_calls]
 
+        usage = None
+        if response.usage:
+            usage = LLMUsage(
+                input_tokens=response.usage.prompt_tokens,
+                output_tokens=response.usage.completion_tokens,
+            )
+
         return LLMResponse(
             content=message.content or "",
             tool_calls=tool_calls,
             finish_reason=response.choices[0].finish_reason,
+            usage=usage,
         )
 
     def stream(

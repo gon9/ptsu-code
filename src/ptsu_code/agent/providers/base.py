@@ -14,12 +14,21 @@ INTERNAL_MESSAGE_FORMAT = "openai-compatible"
 
 
 @dataclass
+class LLMUsage:
+    """LLM トークン使用量。"""
+
+    input_tokens: int
+    output_tokens: int
+
+
+@dataclass
 class LLMResponse:
     """LLM応答。"""
 
     content: str
     tool_calls: list[dict[str, Any]] | None = None
     finish_reason: str = "stop"
+    usage: LLMUsage | None = None
 
 
 @dataclass
