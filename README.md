@@ -10,7 +10,45 @@ AI エージェント CLI ツール
 - **Dream System**: 記憶の整理と最適化
 - **BUDDY**: AI ペット＆ガチャ要素
 
-## セットアップ
+## インストール（マシン全体で使う）
+
+```bash
+# 初回インストール — どのディレクトリからでも ptsu コマンドが使えるようになる
+uv tool install /path/to/ptsu-code
+
+# eval ダッシュボード (streamlit) も含める場合
+uv tool install --extra eval /path/to/ptsu-code
+
+# バージョン確認
+ptsu version
+```
+
+`~/.local/bin` が `PATH` に含まれていない場合は `.zshrc` に追加:
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+## アップデート
+
+```bash
+# コードを変更・コミット後
+git tag v0.X.Y
+uv tool install --reinstall /path/to/ptsu-code
+ptsu version  # 新バージョンを確認
+```
+
+## バージョンポリシー (SemVer: MAJOR.MINOR.PATCH)
+
+| 桁 | 上げるタイミング | 例 |
+|---|---|---|
+| **MAJOR** | 破壊的変更（CLI / 設定 / `~/.ptsu/` データ形式の非互換） | コマンド体系の刷新、設定スキーマ変更 |
+| **MINOR** | 新機能追加（後方互換あり） | 新プロバイダー対応、新ツール追加 |
+| **PATCH** | バグ修正・テスト・リファクタ | ツール呼び出しの修正、カバレッジ補完 |
+
+> `0.x` 系は開発版: MINOR 上げで破壊的変更を許容（SemVer 標準）。`1.0.0` は CLI・設定・データ形式が安定した時点で切る。
+
+## セットアップ（開発）
 
 ### ローカル環境
 
